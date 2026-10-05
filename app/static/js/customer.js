@@ -145,7 +145,7 @@ const CustomerApp = {
     });
 
     totalAmounts.forEach(el => {
-      el.textContent = '₹' + subtotal.toFixed(0);
+      el.textContent = '\u20B9' + subtotal.toFixed(0);
     });
 
     if (floatingBar) {
@@ -155,6 +155,11 @@ const CustomerApp = {
       } else {
         floatingBar.style.display = totalItems > 0 ? 'flex' : 'none';
       }
+    }
+
+    // Re-render cart page items when data is freshly loaded
+    if (window.location.pathname === '/cart' && typeof renderCartItems === 'function') {
+      renderCartItems();
     }
   },
 
