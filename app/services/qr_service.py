@@ -3,7 +3,13 @@ import os
 import qrcode
 from io import BytesIO
 import base64
-from PIL import Image, ImageDraw
+try:
+    from PIL import Image, ImageDraw
+    PIL_AVAILABLE = True
+except ImportError:
+    Image = None
+    ImageDraw = None
+    PIL_AVAILABLE = False
 
 
 class QRService:
@@ -29,8 +35,8 @@ class QRService:
             if os.path.exists(default_logo):
                 logo_path = default_logo
 
-        # Embed logo in the center if valid logo file exists
-        if logo_path and os.path.exists(logo_path):
+        # Embed logo in the center if valid logo file exists and PIL is available
+        if PIL_AVAILABLE and Image is not None and logo_path and os.path.exists(logo_path):
             try:
                 logo = Image.open(logo_path).convert('RGBA')
                 qr_w, qr_h = img.size
