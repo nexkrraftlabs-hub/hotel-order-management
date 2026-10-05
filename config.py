@@ -43,7 +43,7 @@ class Config:
     ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
     
     # Domains & Base URLs
-    APP_BASE_URL = os.environ.get('APP_BASE_URL', '')
+    APP_BASE_URL = os.environ.get('APP_BASE_URL') or 'https://the-royal-feast.onrender.com'
     CUSTOMER_DOMAIN = os.environ.get('CUSTOMER_DOMAIN', 'localhost:5000')
     ADMIN_DOMAIN = os.environ.get('ADMIN_DOMAIN', 'admin.localhost:5000')
     KITCHEN_DOMAIN = os.environ.get('KITCHEN_DOMAIN', 'kitchen.localhost:5000')
