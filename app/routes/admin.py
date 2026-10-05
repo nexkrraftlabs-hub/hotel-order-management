@@ -69,11 +69,18 @@ def dashboard():
     
     recent_orders = Order.query.order_by(Order.created_at.desc()).limit(10).all()
     
+    qr_url = os.environ.get('APP_BASE_URL') or current_app.config.get('APP_BASE_URL') or 'https://hotel-order-management-zdnb.onrender.com/'
+    if 'the-royal-feast' in qr_url:
+        qr_url = 'https://hotel-order-management-zdnb.onrender.com/'
+    qr_img_url = 'https://res.cloudinary.com/dqh2jlqza/image/upload/v1791167187/royal_feast/branding/live_restaurant_qr.png'
+
     return render_template('admin/dashboard.html',
                          order_stats=order_stats,
                          token_stats=token_stats,
                          payment_stats=payment_stats,
-                         recent_orders=recent_orders)
+                         recent_orders=recent_orders,
+                         qr_url=qr_url,
+                         qr_img_url=qr_img_url)
 
 
 # ─── ORDERS ──────────────────────────────────────────────────
@@ -448,12 +455,15 @@ def settings():
         return redirect(url_for('admin.settings'))
     
     # Generate QR code pointing to live production URL (Render) with embedded logo
-    app_base_url = current_app.config.get('APP_BASE_URL') or os.environ.get('APP_BASE_URL') or 'https://hotel-order-management-zdnb.onrender.com/'
+    app_base_url = os.environ.get('APP_BASE_URL') or current_app.config.get('APP_BASE_URL') or 'https://hotel-order-management-zdnb.onrender.com/'
+    if 'the-royal-feast' in app_base_url:
+        app_base_url = 'https://hotel-order-management-zdnb.onrender.com/'
     qr_url = request.args.get('qr_url') or app_base_url
     logo_path = os.path.join(current_app.root_path, 'static', 'img', 'restaurant-logo.png')
     qr_base64 = QRService.generate_qr_base64(qr_url, logo_path=logo_path)
+    qr_img_url = 'https://res.cloudinary.com/dqh2jlqza/image/upload/v1791167187/royal_feast/branding/live_restaurant_qr.png'
     
-    return render_template('admin/settings.html', restaurant=restaurant, qr_base64=qr_base64, qr_url=qr_url)
+    return render_template('admin/settings.html', restaurant=restaurant, qr_base64=qr_base64, qr_url=qr_url, qr_img_url=qr_img_url)
 
 
 @admin_bp.route('/qr/download')
@@ -461,7 +471,9 @@ def settings():
 def download_qr():
     """Download the high-resolution QR code PNG image for printing table/standee boards."""
     from flask import send_file
-    app_base_url = current_app.config.get('APP_BASE_URL') or os.environ.get('APP_BASE_URL') or 'https://hotel-order-management-zdnb.onrender.com/'
+    app_base_url = os.environ.get('APP_BASE_URL') or current_app.config.get('APP_BASE_URL') or 'https://hotel-order-management-zdnb.onrender.com/'
+    if 'the-royal-feast' in app_base_url:
+        app_base_url = 'https://hotel-order-management-zdnb.onrender.com/'
     qr_url = request.args.get('qr_url') or app_base_url
     logo_path = os.path.join(current_app.root_path, 'static', 'img', 'restaurant-logo.png')
     buffer = QRService.generate_qr(qr_url, size=15, logo_path=logo_path)

@@ -103,7 +103,6 @@
         Scan with mobile camera to launch instant ordering menu
       </p>
 
-      {% if qr_base64 %}
       <div style="display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 12px;">
         <img src="{{ restaurant.logo or url_for('static', filename='img/restaurant-logo.png') }}" 
              id="standee-logo"
@@ -112,20 +111,23 @@
         <span style="font-size: 0.88rem; font-weight: 800; color: var(--text-main);">{{ restaurant.name }}</span>
       </div>
 
+      <!-- QR Photo Image -->
       <div style="display: inline-block; padding: 14px; background: #FFFFFF; border: 2px solid var(--light-border); border-radius: var(--radius-lg); box-shadow: var(--shadow-md); margin-bottom: 16px;">
-        <img src="data:image/png;base64,{{ qr_base64 }}" alt="Restaurant QR Code" style="width: 210px; height: 210px; display: block;" id="qr-img">
+        <img src="{% if qr_base64 %}data:image/png;base64,{{ qr_base64 }}{% else %}{{ qr_img_url or url_for('static', filename='img/restaurant-qr.png') }}{% endif %}" 
+             alt="Restaurant QR Code" 
+             style="width: 210px; height: 210px; display: block; border-radius: 8px;" 
+             id="qr-img">
       </div>
-      {% endif %}
 
       <div style="font-size: 0.82rem; font-weight: 800; color: var(--primary); margin-bottom: 6px;">
         <i class="bi bi-qr-code-scan"></i> Smart Branded QR Code
       </div>
       
       <!-- Live Destination URL Display -->
-      <div style="margin-bottom: 14px; background: #F8FAFC; border: 1px solid var(--light-border); border-radius: var(--radius-md); padding: 8px 12px; text-align: center;">
-        <div style="font-size: 0.68rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Live Customer Ordering Destination</div>
-        <a href="{{ qr_url }}" target="_blank" rel="noopener noreferrer" style="font-size: 0.82rem; font-weight: 700; color: var(--primary); text-decoration: none; word-break: break-all; display: inline-flex; align-items: center; justify-content: center; gap: 4px;">
-          <i class="bi bi-link-45deg" style="font-size: 1rem;"></i> {{ qr_url }} <i class="bi bi-box-arrow-up-right" style="font-size: 0.72rem;"></i>
+      <div style="margin-bottom: 14px; background: #FFF1F2; border: 1.5px solid #FECDD3; border-radius: var(--radius-md); padding: 10px 14px; text-align: center;">
+        <div style="font-size: 0.68rem; font-weight: 800; color: #9F1239; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Live Customer Ordering Destination</div>
+        <a href="https://hotel-order-management-zdnb.onrender.com/" target="_blank" rel="noopener noreferrer" style="font-size: 0.82rem; font-weight: 800; color: #E23744; text-decoration: none; word-break: break-all; display: inline-flex; align-items: center; justify-content: center; gap: 5px;">
+          <i class="bi bi-link-45deg" style="font-size: 1.1rem;"></i> https://hotel-order-management-zdnb.onrender.com/ <i class="bi bi-box-arrow-up-right" style="font-size: 0.72rem;"></i>
         </a>
       </div>
 
