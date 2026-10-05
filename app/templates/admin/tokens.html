@@ -1,0 +1,123 @@
+{% extends "admin/base_admin.html" %}
+
+{% block title %}Token Management | Admin{% endblock %}
+
+{% block admin_content %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+  <div>
+    <h1 style="font-size: 1.4rem; font-weight: 800;">Token Management System</h1>
+    <p style="font-size: 0.85rem; color: var(--text-muted);">
+      Table-less contactless token allocation. Automatically cycles through reusable tokens.
+    </p>
+  </div>
+</div>
+
+<!-- Token Stats Bar -->
+<div class="stats-grid">
+  <div class="stat-card">
+    <div class="stat-icon blue">
+      <i class="bi bi-ticket-perforated"></i>
+    </div>
+    <div>
+      <div class="stat-val">{{ stats.total }}</div>
+      <div class="stat-lbl">Total Configured Tokens</div>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon green">
+      <i class="bi bi-check-circle"></i>
+    </div>
+    <div>
+      <div class="stat-val">{{ stats.available }}</div>
+      <div class="stat-lbl">Available for Next Guests</div>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon yellow">
+      <i class="bi bi-people-fill"></i>
+    </div>
+    <div>
+      <div class="stat-val">{{ stats.occupied }}</div>
+      <div class="stat-lbl">Currently Dining (Occupied)</div>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon red">
+      <i class="bi bi-slash-circle"></i>
+    </div>
+    <div>
+      <div class="stat-val">{{ stats.disabled }}</div>
+      <div class="stat-lbl">Disabled Tokens</div>
+    </div>
+  </div>
+</div>
+
+<!-- Token Grid -->
+<div class="data-card">
+  <div class="data-card-header">
+    <h3 style="font-size: 1.05rem; font-weight: 800;">Tokens Matrix (1 to 40)</h3>
+    <div style="display: flex; gap: 14px; font-size: 0.78rem; font-weight: 600;">
+      <span style="display: flex; align-items: center; gap: 4px;"><span style="width: 10px; height: 10px; background: #10B981; border-radius: 50%;"></span> Available</span>
+      <span style="display: flex; align-items: center; gap: 4px;"><span style="width: 10px; height: 10px; background: #F59E0B; border-radius: 50%;"></span> Active / Dining</span>
+      <span style="display: flex; align-items: center; gap: 4px;"><span style="width: 10px; height: 10px; background: #94A3B8; border-radius: 50%;"></span> Disabled</span>
+    </div>
+  </div>
+
+  <div style="padding: 24px; display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 14px;">
+    {% for t in tokens %}
+    {% set is_active = t.status == 'active' or t.status == 'payment_pending' %}
+    {% if not t.is_enabled %}
+    <div class="token-card token-card-disabled">
+      <div>
+        <div class="token-num-disabled">#{{ "%02d"|format(t.token_number) }}</div>
+        <div class="token-lbl-disabled">Disabled</div>
+      </div>
+      <button class="btn-sm btn-toggle-enable" data-id="{{ t.id }}" onclick="toggleToken(this.getAttribute('data-id'))">Enable</button>
+    </div>
+    {% elif is_active %}
+    <div class="token-card token-card-occupied">
+      <div>
+        <div class="token-num-occupied">#{{ "%02d"|format(t.token_number) }}</div>
+        <div class="token-lbl-occupied">Occupied</div>
+      </div>
+      {% if t.active_session %}
+      <div style="font-size: 0.7rem; color: #92400E; background: #FEF3C7; padding: 4px; border-radius: 4px;">
+        {{ t.active_session.orders.count() }} Orders • ₹{{ "%.0f"|format(t.active_session.total_amount) }}
+      </div>
+      {% endif %}
+      <button class="btn-sm btn-toggle-disable" data-id="{{ t.id }}" onclick="toggleToken(this.getAttribute('data-id'))">Disable</button>
+    </div>
+    {% else %}
+    <div class="token-card token-card-available">
+      <div>
+        <div class="token-num-available">#{{ "%02d"|format(t.token_number) }}</div>
+        <div class="token-lbl-available">Available</div>
+      </div>
+      <button class="btn-sm btn-toggle-disable" data-id="{{ t.id }}" onclick="toggleToken(this.getAttribute('data-id'))">Disable</button>
+    </div>
+    {% endif %}
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+{{ super() }}
+<script>
+async function toggleToken(tokenId) {
+  try {
+    const res = await fetch(`/admin/token/${tokenId}/toggle`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    const data = await res.json();
+    if (data.success) {
+      App.showToast(`Token status updated`, 'success');
+      setTimeout(() => location.reload(), 400);
+    }
+  } catch (e) {
+    App.showToast('Network error', 'error');
+  }
+}
+</script>
+{% endblock %}

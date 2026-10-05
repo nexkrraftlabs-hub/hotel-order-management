@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+
+{% block title %}Staff Login | {{ restaurant.name if restaurant else 'The Royal Feast' }}{% endblock %}
+
+{% block body %}
+<div style="min-height: 100vh; background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%); display: flex; align-items: center; justify-content: center; padding: 20px;">
+
+  <div style="max-width: 420px; width: 100%; background: #FFFFFF; border-radius: var(--radius-xl); box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5); overflow: hidden;">
+    
+    <!-- Header -->
+    <div style="background: linear-gradient(135deg, var(--primary) 0%, #FF5A5F 100%); padding: 30px 24px; text-align: center; color: #FFFFFF;">
+      <div style="width: 52px; height: 52px; border-radius: 50%; background: rgba(255,255,255,0.2); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; font-size: 1.6rem; margin: 0 auto 12px;">
+        <i class="bi bi-shield-lock-fill"></i>
+      </div>
+      <h2 style="font-size: 1.35rem; font-weight: 800; margin-bottom: 4px;">Staff Portal</h2>
+      <p style="font-size: 0.82rem; opacity: 0.9;">Admin • Kitchen Display (KDS) • Waiters</p>
+    </div>
+
+    <div style="padding: 24px;">
+      <!-- Flash messages -->
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          {% for category, message in messages %}
+            {% if category == 'danger' %}
+            <div class="alert-box alert-box-danger" style="padding: 10px 14px; margin-bottom: 16px;">
+              {{ message }}
+            </div>
+            {% else %}
+            <div class="alert-box alert-box-info" style="padding: 10px 14px; margin-bottom: 16px;">
+              {{ message }}
+            </div>
+            {% endif %}
+          {% endfor %}
+        {% endif %}
+      {% endwith %}
+
+      <form method="POST" action="{{ url_for('auth.login') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+        <div style="margin-bottom: 16px;">
+          <label style="display: block; font-size: 0.8rem; font-weight: 700; color: var(--text-main); margin-bottom: 6px;">
+            Username
+          </label>
+          <div style="position: relative;">
+            <input type="text" name="username" id="login-username" required placeholder="Enter username" 
+                   style="width: 100%; padding: 12px 14px 12px 38px; border-radius: var(--radius-md); border: 1px solid var(--light-border); font-size: 0.9rem; outline: none;">
+            <i class="bi bi-person" style="position: absolute; left: 14px; top: 12px; color: var(--text-muted); font-size: 1.1rem;"></i>
+          </div>
+        </div>
+
+        <div style="margin-bottom: 22px;">
+          <label style="display: block; font-size: 0.8rem; font-weight: 700; color: var(--text-main); margin-bottom: 6px;">
+            Password
+          </label>
+          <div style="position: relative;">
+            <input type="password" name="password" id="login-password" required placeholder="Enter password" 
+                   style="width: 100%; padding: 12px 14px 12px 38px; border-radius: var(--radius-md); border: 1px solid var(--light-border); font-size: 0.9rem; outline: none;">
+            <i class="bi bi-key" style="position: absolute; left: 14px; top: 12px; color: var(--text-muted); font-size: 1.1rem;"></i>
+          </div>
+        </div>
+
+        <button type="submit" class="btn-primary-block">
+          <i class="bi bi-box-arrow-in-right"></i> Sign In to Dashboard
+        </button>
+      </form>
+
+      <!-- Quick Fill Credentials Helper -->
+      <div style="margin-top: 24px; padding-top: 18px; border-top: 1px dashed var(--light-border);">
+        <div style="font-size: 0.75rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-bottom: 10px; text-align: center;">
+          Quick Demo Login
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;">
+          <button type="button" class="btn-sm btn-outline" style="justify-content: center; font-size: 0.75rem;" onclick="fillLogin('admin', 'admin123')">
+            <i class="bi bi-gear-fill"></i> Admin
+          </button>
+          <button type="button" class="btn-sm btn-outline" style="justify-content: center; font-size: 0.75rem;" onclick="fillLogin('kitchen', 'kitchen123')">
+            <i class="bi bi-fire"></i> Kitchen
+          </button>
+          <button type="button" class="btn-sm btn-outline" style="justify-content: center; font-size: 0.75rem;" onclick="fillLogin('waiter', 'waiter123')">
+            <i class="bi bi-person-badge"></i> Waiter
+          </button>
+        </div>
+      </div>
+
+      <div style="text-align: center; margin-top: 20px;">
+        <a href="{{ url_for('customer.home') }}" style="font-size: 0.8rem; color: var(--text-muted); text-decoration: none;">
+          <i class="bi bi-arrow-left"></i> Return to Customer Ordering
+        </a>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<script>
+function fillLogin(u, p) {
+  document.getElementById('login-username').value = u;
+  document.getElementById('login-password').value = p;
+}
+</script>
+{% endblock %}

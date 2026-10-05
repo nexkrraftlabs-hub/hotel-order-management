@@ -1,0 +1,136 @@
+{% extends "admin/base_admin.html" %}
+
+{% block title %}Manage Orders | Admin{% endblock %}
+
+{% block admin_content %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+  <div>
+    <h1 style="font-size: 1.4rem; font-weight: 800;">Orders Management</h1>
+    <p style="font-size: 0.85rem; color: var(--text-muted);">View, approve, and track all guest orders</p>
+  </div>
+</div>
+
+<!-- Status Filters -->
+<div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px;">
+  {% for key, lbl in [('all', 'All Orders'), ('pending', 'Pending Approval'), ('confirmed', 'Confirmed'), ('sent_to_kitchen', 'Sent to Kitchen'), ('preparing', 'Preparing'), ('ready', 'Ready'), ('serving', 'Serving'), ('served', 'Served'), ('paid', 'Paid')] %}
+  <a href="{{ url_for('admin.orders', status=key) }}" 
+     class="btn-sm {% if status_filter == key %}btn-primary{% else %}btn-outline{% endif %}">
+    {{ lbl }}
+  </a>
+  {% endfor %}
+</div>
+
+<div class="data-card">
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Token</th>
+        <th>Order ID</th>
+        <th>Session</th>
+        <th>Items & Notes</th>
+        <th>Total Amount</th>
+        <th>Status</th>
+        <th>Payment</th>
+        <th>Time</th>
+        <th>Action</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for o in orders %}
+      <tr>
+        <td style="font-weight: 800; color: var(--primary);">
+          #{{ "%02d"|format(o.session.token.token_number) if o.session and o.session.token else '--' }}
+        </td>
+        <td style="font-weight: 700;">{{ o.order_id }}</td>
+        <td style="font-size: 0.8rem; color: var(--text-muted);">
+          {{ o.session.customer_name if o.session.customer_name else 'Guest' }}<br>
+          <span style="font-size: 0.72rem;">{{ o.session.session_id[:12] }}...</span>
+        </td>
+        <td>
+          <div style="font-weight: 600;">
+            {% for it in o.items %}
+              <div>{{ it.quantity }}x {{ it.item_name }}</div>
+            {% endfor %}
+          </div>
+          {% if o.special_instructions %}
+          <div style="font-size: 0.75rem; color: #D97706; margin-top: 4px;">
+            <i class="bi bi-chat-left-text"></i> {{ o.special_instructions }}
+          </div>
+          {% endif %}
+        </td>
+        <td style="font-weight: 800; font-size: 0.95rem;">₹{{ "%.0f"|format(o.total_amount) }}</td>
+        <td>
+          {% if o.status == 'pending' %}
+          <span class="badge badge-pending">{{ o.status_display }}</span>
+          {% elif o.status in ['preparing', 'kitchen_accepted'] %}
+          <span class="badge badge-cooking">{{ o.status_display }}</span>
+          {% elif o.status == 'ready' %}
+          <span class="badge badge-ready">{{ o.status_display }}</span>
+          {% elif o.status == 'served' %}
+          <span class="badge badge-served">{{ o.status_display }}</span>
+          {% elif o.status == 'paid' %}
+          <span class="badge badge-paid">{{ o.status_display }}</span>
+          {% else %}
+          <span class="badge badge-confirmed">{{ o.status_display }}</span>
+          {% endif %}
+        </td>
+        <td>
+          {% if o.payment_status == 'paid' %}
+          <span class="badge badge-paid">{{ o.payment_status }}</span>
+          {% else %}
+          <span class="badge badge-pending">{{ o.payment_status }}</span>
+          {% endif %}
+        </td>
+        <td style="font-size: 0.78rem; color: var(--text-muted);">
+          {{ o.created_at.strftime('%d %b, %I:%M %p') if o.created_at else '' }}
+        </td>
+        <td>
+          {% if o.status == 'pending' %}
+          <button class="btn-sm btn-primary" data-id="{{ o.id }}" onclick="adminConfirmOrder(this.getAttribute('data-id'))">Confirm</button>
+          {% elif o.status == 'confirmed' %}
+          <button class="btn-sm btn-success" data-id="{{ o.id }}" onclick="adminSendKitchen(this.getAttribute('data-id'))">Send to Kitchen</button>
+          {% else %}
+          <span style="font-size: 0.78rem; color: var(--text-muted);"><i class="bi bi-check2"></i> Active</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% else %}
+      <tr>
+        <td colspan="9" style="text-align: center; color: var(--text-muted); padding: 40px;">
+          No orders found matching this filter.
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+{{ super() }}
+<script>
+async function adminConfirmOrder(orderId) {
+  const res = await fetch(`/admin/order/${orderId}/confirm`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' }
+  });
+  const data = await res.json();
+  if (data.success) {
+    App.showToast('Order confirmed', 'success');
+    setTimeout(() => location.reload(), 400);
+  }
+}
+
+async function adminSendKitchen(orderId) {
+  const res = await fetch(`/admin/order/${orderId}/send-to-kitchen`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' }
+  });
+  const data = await res.json();
+  if (data.success) {
+    App.showToast('Order sent to kitchen', 'success');
+    setTimeout(() => location.reload(), 400);
+  }
+}
+</script>
+{% endblock %}

@@ -1,0 +1,92 @@
+{% extends "customer/base_customer.html" %}
+
+{% block title %}Menu | {{ restaurant.name if restaurant else 'The Royal Feast' }}{% endblock %}
+
+{% block customer_content %}
+<!-- Search Header Bar -->
+<div class="search-container">
+  <a href="{{ url_for('customer.search') }}" class="search-box" style="text-decoration: none; cursor: pointer; display: flex;">
+    <i class="bi bi-search"></i>
+    <input type="text" placeholder="Search menu..." readonly style="cursor: pointer;">
+  </a>
+</div>
+
+<!-- Category Pills Navigation -->
+<div style="padding: 0 16px 10px; overflow-x: auto; white-space: nowrap; scrollbar-width: none;">
+  <div style="display: inline-flex; gap: 8px;">
+    <a href="{{ url_for('customer.menu') }}" 
+       class="diet-pill {% if not active_category %}active{% endif %}" style="text-decoration: none;">
+      All Categories
+    </a>
+    {% for cat in categories %}
+    <a href="{{ url_for('customer.menu', category=cat.id) }}" 
+       class="diet-pill {% if active_category and active_category.id == cat.id %}active{% endif %}" style="text-decoration: none;">
+      {{ cat.name }}
+    </a>
+    {% endfor %}
+  </div>
+</div>
+
+<!-- Dietary Filter Tabs -->
+<div class="filter-tabs">
+  <div class="diet-pill active" data-filter="all">All Dishes</div>
+  <div class="diet-pill" data-filter="veg">
+    <span class="diet-icon veg"></span> Pure Veg
+  </div>
+  <div class="diet-pill" data-filter="nonveg">
+    <span class="diet-icon nonveg"></span> Non-Veg
+  </div>
+</div>
+
+<!-- Food Items List -->
+<div class="food-items-container">
+  <div class="section-title">
+    <span>{{ active_category.name if active_category else 'All Menu Dishes' }}</span>
+    <span style="font-size: 0.8rem; color: var(--text-muted);">{{ items|length }} Items</span>
+  </div>
+
+  {% if items %}
+    {% for item in items %}
+    <div class="food-card" data-is-veg="{{ 'true' if item.is_veg else 'false' }}">
+      <div class="food-card-left">
+        <div class="badge-row">
+          <span class="diet-icon {{ 'veg' if item.is_veg else 'nonveg' }}"></span>
+          {% if item.is_popular %}
+          <span class="bestseller-badge">Bestseller</span>
+          {% endif %}
+          <span class="rating-badge">
+            <i class="bi bi-star-fill"></i> {{ "%.1f"|format(item.rating) }}
+          </span>
+          <span style="font-size: 0.7rem; color: var(--text-muted);"><i class="bi bi-clock"></i> {{ item.preparation_time }}m</span>
+        </div>
+
+        <h3 class="food-title">{{ item.name }}</h3>
+
+        <div class="price-row">
+          <span class="current-price">₹{{ "%.0f"|format(item.effective_price) }}</span>
+          {% if item.discount_price and item.discount_price < item.price %}
+          <span class="original-price">₹{{ "%.0f"|format(item.price) }}</span>
+          <span class="discount-tag">{{ item.discount_percentage }}% OFF</span>
+          {% endif %}
+        </div>
+
+        <p class="food-desc">{{ item.description }}</p>
+      </div>
+
+      <div class="food-card-right">
+        <img src="{{ item.image if item.image else 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&q=80' }}" 
+             alt="{{ item.name }}" class="food-thumbnail" loading="lazy">
+        <div class="add-btn-wrapper" data-item-id="{{ item.id }}">
+          <button class="btn-add-food" data-item-id="{{ item.id }}" onclick="CustomerApp.addToCart(this.getAttribute('data-item-id'), 1)">ADD</button>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  {% else %}
+    <div style="text-align: center; padding: 40px 20px; color: var(--text-muted);">
+      <i class="bi bi-cup-hot" style="font-size: 2.5rem; color: #CBD5E1; display: block; margin-bottom: 10px;"></i>
+      <p style="font-weight: 600;">No dishes found in this category.</p>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

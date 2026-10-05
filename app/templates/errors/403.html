@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+
+{% block title %}Access Denied (403){% endblock %}
+
+{% block body %}
+<div style="min-height: 100vh; display: flex; align-items: center; justify-content: center; background: #F8FAFC; padding: 20px; text-align: center;">
+  <div style="max-width: 440px; background: #FFFFFF; border-radius: var(--radius-xl); padding: 40px 30px; box-shadow: var(--shadow-lg); border: 1px solid var(--light-border);">
+    <div style="font-size: 3.5rem; color: #DC2626; margin-bottom: 12px;"><i class="bi bi-shield-x"></i></div>
+    <h2 style="font-size: 1.3rem; font-weight: 800; margin-bottom: 6px;">Access Restricted</h2>
+    <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 24px;">You do not have staff permissions to view this section.</p>
+    <a href="{{ url_for('auth.login') }}" class="btn-primary-block" style="text-decoration: none;">
+      <i class="bi bi-box-arrow-in-right"></i> Staff Login
+    </a>
+  </div>
+</div>
+{% endblock %}

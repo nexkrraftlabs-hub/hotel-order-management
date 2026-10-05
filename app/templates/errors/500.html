@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+
+{% block title %}Server Error (500){% endblock %}
+
+{% block body %}
+<div style="min-height: 100vh; display: flex; align-items: center; justify-content: center; background: #F8FAFC; padding: 20px; text-align: center;">
+  <div style="max-width: 440px; background: #FFFFFF; border-radius: var(--radius-xl); padding: 40px 30px; box-shadow: var(--shadow-lg); border: 1px solid var(--light-border);">
+    <div style="font-size: 4rem; font-weight: 900; color: #DC2626; line-height: 1;">500</div>
+    <h2 style="font-size: 1.3rem; font-weight: 800; margin: 12px 0 6px;">Kitchen Smoke / Server Hiccup</h2>
+    <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 24px;">An internal error occurred. Please try again or notify staff.</p>
+    <a href="{{ url_for('customer.home') }}" class="btn-primary-block" style="text-decoration: none;">
+      <i class="bi bi-house-door"></i> Return Home
+    </a>
+  </div>
+</div>
+{% endblock %}

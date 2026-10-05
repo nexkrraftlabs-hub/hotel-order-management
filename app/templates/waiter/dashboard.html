@@ -1,0 +1,285 @@
+{% extends "waiter/base_waiter.html" %}
+
+{% block title %}Waiter Dashboard | {{ restaurant.name if restaurant else 'The Royal Feast' }}{% endblock %}
+
+{% block waiter_content %}
+<div style="max-width: 1200px; margin: 0 auto;">
+
+  <!-- SECTION 1: READY FOR PICKUP -->
+  <div style="margin-bottom: 30px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+      <h3 style="font-size: 1.15rem; font-weight: 800; color: #FFFFFF; display: flex; align-items: center; gap: 8px;">
+        <i class="bi bi-box-seam-fill" style="color: #6366F1;"></i> Ready for Pickup from Kitchen
+        <span class="badge" style="background: #6366F1; color: #fff;" id="waiter-pickup-count">{{ ready_for_pickup|length }}</span>
+      </h3>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px;" id="waiter-pickup-grid">
+      {% for o in ready_for_pickup %}
+      <div class="kds-card" style="background: #1E293B; border-color: #6366F1; box-shadow: 0 4px 15px rgba(99, 102, 241, 0.2);">
+        <div class="kds-card-top">
+          <div class="kds-token-num" style="color: #A5B4FC;">TOKEN #{{ "%02d"|format(o.session.token.token_number) if o.session and o.session.token else '--' }}</div>
+          <div class="kds-timer" style="color: #6ee7b7;"><i class="bi bi-check-circle-fill"></i> Ready</div>
+        </div>
+        <div style="font-size: 0.78rem; color: #94A3B8; margin-bottom: 8px;">
+          Order: <strong>{{ o.order_id }}</strong> {% if o.session.customer_name %}• {{ o.session.customer_name }}{% endif %}
+        </div>
+
+        <ul class="kds-item-list">
+          {% for item in o.items %}
+          <li class="kds-item">
+            <span>
+              <span class="qty-badge">{{ item.quantity }}x</span>
+              <span class="diet-icon {{ 'veg' if item.is_veg else 'nonveg' }}" style="display: inline-block; vertical-align: middle;"></span>
+              {{ item.item_name }}
+            </span>
+          </li>
+          {% endfor %}
+        </ul>
+
+        {% if o.special_instructions %}
+        <div class="kds-instructions">
+          <i class="bi bi-info-circle-fill"></i> {{ o.special_instructions }}
+        </div>
+        {% endif %}
+
+        <button class="btn-primary-block" style="background: #6366F1; padding: 12px;" data-id="{{ o.id }}" onclick="waiterAction('accept', this.getAttribute('data-id'))">
+          <i class="bi bi-person-walking"></i> Pick Up & Deliver to Token
+        </button>
+      </div>
+      {% else %}
+      <div style="grid-column: 1 / -1; background: #1E293B; border-radius: var(--radius-md); padding: 30px; text-align: center; color: #94A3B8;">
+        <i class="bi bi-cup-hot" style="font-size: 2rem; display: block; margin-bottom: 8px; color: #475569;"></i>
+        No orders waiting for pickup right now.
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- SECTION 2: CURRENTLY DELIVERING / SERVING -->
+  <div style="margin-bottom: 30px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+      <h3 style="font-size: 1.15rem; font-weight: 800; color: #FFFFFF; display: flex; align-items: center; gap: 8px;">
+        <i class="bi bi-clock-history" style="color: #F59E0B;"></i> In Progress / Delivering to Token
+        <span class="badge" style="background: #F59E0B; color: #000;" id="waiter-serving-count">{{ serving_orders|length }}</span>
+      </h3>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px;" id="waiter-serving-grid">
+      {% for o in serving_orders %}
+      <div class="kds-card" style="background: #1E293B; border-color: #F59E0B;">
+        <div class="kds-card-top">
+          <div class="kds-token-num" style="color: #FCD34D;">TOKEN #{{ "%02d"|format(o.session.token.token_number) if o.session and o.session.token else '--' }}</div>
+          <div class="kds-timer" style="color: #FCD34D;"><i class="bi bi-bicycle"></i> Delivering</div>
+        </div>
+        <div style="font-size: 0.78rem; color: #94A3B8; margin-bottom: 8px;">
+          Order: <strong>{{ o.order_id }}</strong>
+        </div>
+
+        <ul class="kds-item-list">
+          {% for item in o.items %}
+          <li class="kds-item">
+            <span>
+              <span class="qty-badge">{{ item.quantity }}x</span>
+              <span class="diet-icon {{ 'veg' if item.is_veg else 'nonveg' }}" style="display: inline-block; vertical-align: middle;"></span>
+              {{ item.item_name }}
+            </span>
+          </li>
+          {% endfor %}
+        </ul>
+
+        <button class="btn-primary-block" style="background: var(--veg-color); padding: 12px;" data-id="{{ o.id }}" onclick="waiterAction('served', this.getAttribute('data-id'))">
+          <i class="bi bi-check2-circle"></i> Mark Order as Served
+        </button>
+      </div>
+      {% else %}
+      <div style="grid-column: 1 / -1; background: #1E293B; border-radius: var(--radius-md); padding: 24px; text-align: center; color: #94A3B8;">
+        No active orders currently out for delivery.
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- SECTION 3: RECENTLY SERVED -->
+  <div>
+    <h3 style="font-size: 1.05rem; font-weight: 700; color: #94A3B8; margin-bottom: 12px;">Recently Served</h3>
+    <div style="background: #1E293B; border-radius: var(--radius-md); border: 1px solid #334155; overflow: hidden;">
+      <table class="data-table" style="color: #E2E8F0;">
+        <thead>
+          <tr style="background: #172033;">
+            <th style="color: #94A3B8; border-color: #334155;">Token</th>
+            <th style="color: #94A3B8; border-color: #334155;">Order ID</th>
+            <th style="color: #94A3B8; border-color: #334155;">Items</th>
+            <th style="color: #94A3B8; border-color: #334155;">Served At</th>
+            <th style="color: #94A3B8; border-color: #334155;">Status</th>
+          </tr>
+        </thead>
+        <tbody id="waiter-served-tbody">
+          {% for o in recently_served %}
+          <tr style="border-color: #334155;">
+            <td style="font-weight: 800; color: #FCD34D; border-color: #334155;">#{{ "%02d"|format(o.session.token.token_number) if o.session and o.session.token else '--' }}</td>
+            <td style="border-color: #334155;">{{ o.order_id }}</td>
+            <td style="border-color: #334155;">{{ o.items|length }} items</td>
+            <td style="border-color: #334155; color: #94A3B8;">{{ o.served_at.strftime('%I:%M %p') if o.served_at else '' }}</td>
+            <td style="border-color: #334155;">
+              <span class="badge" style="background: rgba(14, 159, 110, 0.2); color: #34D399;">SERVED</span>
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="5" style="text-align: center; color: #94A3B8; border-color: #334155; padding: 20px;">
+              No recently served orders yet.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+{{ super() }}
+<script>
+async function waiterAction(action, orderId) {
+  try {
+    const res = await fetch(`/waiter/${action}/${orderId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    const data = await res.json();
+    if (data.success) {
+      App.showToast(`Order updated`, 'success');
+      reloadWaiterOrders();
+    } else {
+      App.showToast(data.error || 'Failed to update', 'error');
+    }
+  } catch (e) {
+    App.showToast('Network error', 'error');
+  }
+}
+
+async function reloadWaiterOrders() {
+  try {
+    const res = await fetch('/waiter/api/orders');
+    const data = await res.json();
+
+    document.getElementById('waiter-pickup-count').textContent = data.ready_for_pickup.length;
+    document.getElementById('waiter-serving-count').textContent = data.serving.length;
+
+    renderPickupGrid(data.ready_for_pickup);
+    renderServingGrid(data.serving);
+    renderServedTable(data.recently_served);
+  } catch (e) {
+    console.error('Failed to reload waiter orders', e);
+  }
+}
+
+function renderPickupGrid(orders) {
+  const container = document.getElementById('waiter-pickup-grid');
+  if (!container) return;
+
+  if (orders.length === 0) {
+    container.innerHTML = `
+      <div style="grid-column: 1 / -1; background: #1E293B; border-radius: var(--radius-md); padding: 30px; text-align: center; color: #94A3B8;">
+        <i class="bi bi-cup-hot" style="font-size: 2rem; display: block; margin-bottom: 8px; color: #475569;"></i>
+        No orders waiting for pickup right now.
+      </div>
+    `;
+    return;
+  }
+
+  let html = '';
+  orders.forEach(o => {
+    let itemsHtml = o.items.map(it => `
+      <li class="kds-item">
+        <span>
+          <span class="qty-badge">${it.qty}x</span>
+          <span class="diet-icon ${it.is_veg ? 'veg' : 'nonveg'}" style="display: inline-block; vertical-align: middle;"></span>
+          ${it.name}
+        </span>
+      </li>
+    `).join('');
+
+    html += `
+      <div class="kds-card" style="background: #1E293B; border-color: #6366F1; box-shadow: 0 4px 15px rgba(99, 102, 241, 0.2);">
+        <div class="kds-card-top">
+          <div class="kds-token-num" style="color: #A5B4FC;">TOKEN #${o.token ? String(o.token).padStart(2, '0') : '--'}</div>
+          <div class="kds-timer" style="color: #6ee7b7;"><i class="bi bi-check-circle-fill"></i> Ready</div>
+        </div>
+        <div style="font-size: 0.78rem; color: #94A3B8; margin-bottom: 8px;">Order: <strong>${o.order_id}</strong></div>
+        <ul class="kds-item-list">${itemsHtml}</ul>
+        ${o.special_instructions ? `<div class="kds-instructions"><i class="bi bi-info-circle-fill"></i> ${o.special_instructions}</div>` : ''}
+        <button class="btn-primary-block" style="background: #6366F1; padding: 12px;" onclick="waiterAction('accept', ${o.id})">
+          <i class="bi bi-person-walking"></i> Pick Up & Deliver to Token
+        </button>
+      </div>
+    `;
+  });
+  container.innerHTML = html;
+}
+
+function renderServingGrid(orders) {
+  const container = document.getElementById('waiter-serving-grid');
+  if (!container) return;
+
+  if (orders.length === 0) {
+    container.innerHTML = `
+      <div style="grid-column: 1 / -1; background: #1E293B; border-radius: var(--radius-md); padding: 24px; text-align: center; color: #94A3B8;">
+        No active orders currently out for delivery.
+      </div>
+    `;
+    return;
+  }
+
+  let html = '';
+  orders.forEach(o => {
+    let itemsHtml = o.items.map(it => `
+      <li class="kds-item">
+        <span>
+          <span class="qty-badge">${it.qty}x</span>
+          <span class="diet-icon ${it.is_veg ? 'veg' : 'nonveg'}" style="display: inline-block; vertical-align: middle;"></span>
+          ${it.name}
+        </span>
+      </li>
+    `).join('');
+
+    html += `
+      <div class="kds-card" style="background: #1E293B; border-color: #F59E0B;">
+        <div class="kds-card-top">
+          <div class="kds-token-num" style="color: #FCD34D;">TOKEN #${o.token ? String(o.token).padStart(2, '0') : '--'}</div>
+          <div class="kds-timer" style="color: #FCD34D;"><i class="bi bi-bicycle"></i> Delivering</div>
+        </div>
+        <div style="font-size: 0.78rem; color: #94A3B8; margin-bottom: 8px;">Order: <strong>${o.order_id}</strong></div>
+        <ul class="kds-item-list">${itemsHtml}</ul>
+        <button class="btn-primary-block" style="background: var(--veg-color); padding: 12px;" onclick="waiterAction('served', ${o.id})">
+          <i class="bi bi-check2-circle"></i> Mark Order as Served
+        </button>
+      </div>
+    `;
+  });
+  container.innerHTML = html;
+}
+
+function renderServedTable(orders) {
+  const tbody = document.getElementById('waiter-served-tbody');
+  if (!tbody || orders.length === 0) return;
+
+  tbody.innerHTML = orders.map(o => `
+    <tr style="border-color: #334155;">
+      <td style="font-weight: 800; color: #FCD34D; border-color: #334155;">#${o.token ? String(o.token).padStart(2, '0') : '--'}</td>
+      <td style="border-color: #334155;">${o.order_id}</td>
+      <td style="border-color: #334155;">${o.items.length} items</td>
+      <td style="border-color: #334155; color: #94A3B8;">${o.ready_at ? new Date(o.ready_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : ''}</td>
+      <td style="border-color: #334155;">
+        <span class="badge" style="background: rgba(14, 159, 110, 0.2); color: #34D399;">SERVED</span>
+      </td>
+    </tr>
+  `).join('');
+}
+
+setInterval(reloadWaiterOrders, 4000);
+</script>
+{% endblock %}

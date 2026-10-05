@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+
+{% block body %}
+<div class="customer-viewport">
+
+  <!-- Customer Header -->
+  <header class="customer-header">
+    <a href="{{ url_for('customer.home') }}" class="brand-wrapper">
+      <div class="brand-icon">
+        <i class="bi bi-fire"></i>
+      </div>
+      <div class="brand-info">
+        <h1>{{ restaurant.name if restaurant else 'The Royal Feast' }}</h1>
+        <p>
+          <span class="status-dot"></span>
+          <span>Kitchen Active • Token Ordering</span>
+        </p>
+      </div>
+    </a>
+
+    <div class="header-actions">
+      <!-- Active Token Pill -->
+      <a href="{{ url_for('customer.orders') }}" class="token-pill active-token-container" style="display: none;" title="Your Active Token">
+        <i class="bi bi-ticket-perforated-fill"></i>
+        <span class="active-token-num">#--</span>
+      </a>
+
+      <!-- Notifications -->
+      <a href="{{ url_for('customer.notifications') }}" class="icon-btn" title="Notifications">
+        <i class="bi bi-bell"></i>
+        <span class="badge-counter" id="unread-notif-count" style="display: none;">0</span>
+      </a>
+    </div>
+  </header>
+
+  <!-- Main Customer Content Area -->
+  <main style="flex: 1;">
+    {% block customer_content %}{% endblock %}
+  </main>
+
+  <!-- Floating Cart Bar (Appears when items are in cart) -->
+  <a id="floating-cart-bar" href="{{ url_for('customer.cart') }}" class="floating-cart-bar" style="display: none; text-decoration: none;">
+    <div class="cart-bar-left">
+      <span class="cart-items-count"><span class="cart-badge-count">0</span> items added</span>
+      <span class="cart-bar-total cart-total-amount">₹0</span>
+    </div>
+    <div class="cart-bar-right">
+      <span>View Cart</span>
+      <i class="bi bi-arrow-right"></i>
+    </div>
+  </a>
+
+  <!-- Bottom Navigation Bar -->
+  <nav class="bottom-nav">
+    <a href="{{ url_for('customer.home') }}" class="nav-item {% if request.endpoint == 'customer.home' %}active{% endif %}">
+      <i class="bi bi-house-door{% if request.endpoint == 'customer.home' %}-fill{% endif %}"></i>
+      <span>Home</span>
+    </a>
+    <a href="{{ url_for('customer.menu') }}" class="nav-item {% if request.endpoint == 'customer.menu' %}active{% endif %}">
+      <i class="bi bi-grid{% if request.endpoint == 'customer.menu' %}-fill{% endif %}"></i>
+      <span>Menu</span>
+    </a>
+    <a href="{{ url_for('customer.orders') }}" class="nav-item {% if request.endpoint == 'customer.orders' %}active{% endif %}">
+      <i class="bi bi-receipt{% if request.endpoint == 'customer.orders' %}-cutoff{% endif %}"></i>
+      <span>Orders</span>
+    </a>
+    <a href="{{ url_for('customer.profile') }}" class="nav-item {% if request.endpoint == 'customer.profile' %}active{% endif %}">
+      <i class="bi bi-person{% if request.endpoint == 'customer.profile' %}-fill{% endif %}"></i>
+      <span>Profile</span>
+    </a>
+  </nav>
+
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{{ url_for('static', filename='js/customer.js') }}"></script>
+{% endblock %}

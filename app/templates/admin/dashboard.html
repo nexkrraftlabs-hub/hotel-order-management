@@ -1,0 +1,209 @@
+{% extends "admin/base_admin.html" %}
+
+{% block title %}Admin Dashboard | The Royal Feast{% endblock %}
+
+{% block admin_content %}
+<!-- Page Header -->
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+  <div>
+    <h1 style="font-size: 1.5rem; font-weight: 800; color: var(--text-main);">Operations Overview</h1>
+    <p style="font-size: 0.85rem; color: var(--text-muted);">Real-time metrics, tokens, orders, and payment flow</p>
+  </div>
+  <div style="display: flex; gap: 10px;">
+    <a href="{{ url_for('admin.live_orders') }}" class="btn-sm btn-primary">
+      <i class="bi bi-broadcast"></i> Live Orders Board
+    </a>
+    <a href="{{ url_for('admin.tokens') }}" class="btn-sm btn-outline">
+      <i class="bi bi-ticket-perforated"></i> View Tokens
+    </a>
+  </div>
+</div>
+
+<!-- KPI Stats Grid -->
+<div class="stats-grid">
+  <!-- Today's Revenue -->
+  <div class="stat-card">
+    <div class="stat-icon green">
+      <i class="bi bi-currency-rupee"></i>
+    </div>
+    <div>
+      <div class="stat-val">₹{{ "%.0f"|format(payment_stats.total_collected_today) }}</div>
+      <div class="stat-lbl">Today's Revenue ({{ payment_stats.payments_today }} paid)</div>
+    </div>
+  </div>
+
+  <!-- Today's Orders -->
+  <div class="stat-card">
+    <div class="stat-icon red">
+      <i class="bi bi-bag-check-fill"></i>
+    </div>
+    <div>
+      <div class="stat-val">{{ order_stats.total_orders }}</div>
+      <div class="stat-lbl">Total Orders Today</div>
+    </div>
+  </div>
+
+  <!-- Active Tokens -->
+  <div class="stat-card">
+    <div class="stat-icon blue">
+      <i class="bi bi-ticket-perforated-fill"></i>
+    </div>
+    <div>
+      <div class="stat-val">{{ token_stats.occupied }} <span style="font-size: 0.9rem; color: var(--text-muted); font-weight: 500;">/ {{ token_stats.total }}</span></div>
+      <div class="stat-lbl">Occupied / Total Tokens</div>
+    </div>
+  </div>
+
+  <!-- Pending Payments -->
+  <div class="stat-card">
+    <div class="stat-icon yellow">
+      <i class="bi bi-hourglass-split"></i>
+    </div>
+    <div>
+      <div class="stat-val">{{ payment_stats.pending_payments }}</div>
+      <div class="stat-lbl">Pending Approvals</div>
+    </div>
+  </div>
+</div>
+
+<!-- Order Pipeline Status Bar -->
+<div style="background: #FFFFFF; border-radius: var(--radius-lg); padding: 18px 24px; border: 1px solid var(--light-border); box-shadow: var(--shadow-sm); margin-bottom: 28px;">
+  <div style="font-size: 0.82rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-bottom: 14px;">
+    Live Order Pipeline
+  </div>
+  <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; text-align: center;">
+    <div style="padding: 12px; background: #FEF3C7; border-radius: var(--radius-md);">
+      <div style="font-size: 1.5rem; font-weight: 900; color: #92400E;">{{ order_stats.pending_orders }}</div>
+      <div style="font-size: 0.75rem; font-weight: 700; color: #B45309;">New / Pending</div>
+    </div>
+    <div style="padding: 12px; background: #FFEDD5; border-radius: var(--radius-md);">
+      <div style="font-size: 1.5rem; font-weight: 900; color: #9A3412;">{{ order_stats.preparing_orders }}</div>
+      <div style="font-size: 0.75rem; font-weight: 700; color: #C2410C;">In Kitchen</div>
+    </div>
+    <div style="padding: 12px; background: #DCFCE7; border-radius: var(--radius-md);">
+      <div style="font-size: 1.5rem; font-weight: 900; color: #166534;">{{ order_stats.ready_orders }}</div>
+      <div style="font-size: 0.75rem; font-weight: 700; color: #15803D;">Ready for Waiter</div>
+    </div>
+    <div style="padding: 12px; background: #F3E8FF; border-radius: var(--radius-md);">
+      <div style="font-size: 1.5rem; font-weight: 900; color: #6B21A8;">{{ order_stats.served_orders }}</div>
+      <div style="font-size: 0.75rem; font-weight: 700; color: #7E22CE;">Served to Token</div>
+    </div>
+  </div>
+</div>
+
+<!-- Recent Orders Table -->
+<div class="data-card">
+  <div class="data-card-header">
+    <h3 style="font-size: 1.05rem; font-weight: 800; color: var(--text-main);">Recent Orders</h3>
+    <a href="{{ url_for('admin.orders') }}" class="btn-sm btn-outline">View All Orders</a>
+  </div>
+
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Token</th>
+        <th>Order ID</th>
+        <th>Items</th>
+        <th>Total Amount</th>
+        <th>Status</th>
+        <th>Payment</th>
+        <th>Time</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for o in recent_orders %}
+      <tr>
+        <td style="font-weight: 800; color: var(--primary);">
+          #{{ "%02d"|format(o.session.token.token_number) if o.session and o.session.token else '--' }}
+        </td>
+        <td style="font-weight: 600;">{{ o.order_id }}</td>
+        <td>{{ o.items|length }} items</td>
+        <td style="font-weight: 800;">₹{{ "%.0f"|format(o.total_amount) }}</td>
+        <td>
+          {% if o.status == 'pending' %}
+          <span class="badge badge-pending">{{ o.status_display }}</span>
+          {% elif o.status in ['preparing', 'kitchen_accepted'] %}
+          <span class="badge badge-cooking">{{ o.status_display }}</span>
+          {% elif o.status == 'ready' %}
+          <span class="badge badge-ready">{{ o.status_display }}</span>
+          {% elif o.status == 'served' %}
+          <span class="badge badge-served">{{ o.status_display }}</span>
+          {% elif o.status == 'paid' %}
+          <span class="badge badge-paid">{{ o.status_display }}</span>
+          {% else %}
+          <span class="badge badge-confirmed">{{ o.status_display }}</span>
+          {% endif %}
+        </td>
+        <td>
+          {% if o.payment_status == 'paid' %}
+          <span class="badge badge-paid">{{ o.payment_status }}</span>
+          {% else %}
+          <span class="badge badge-pending">{{ o.payment_status }}</span>
+          {% endif %}
+        </td>
+        <td style="color: var(--text-muted); font-size: 0.8rem;">
+          {{ o.created_at.strftime('%I:%M %p') if o.created_at else '' }}
+        </td>
+        <td>
+          {% if o.status == 'pending' %}
+          <button class="btn-sm btn-primary" data-id="{{ o.id }}" onclick="adminConfirmOrder(this.getAttribute('data-id'))">Confirm</button>
+          {% elif o.status == 'confirmed' %}
+          <button class="btn-sm btn-success" data-id="{{ o.id }}" onclick="adminSendKitchen(this.getAttribute('data-id'))">Send to Kitchen</button>
+          {% else %}
+          <span style="font-size: 0.78rem; color: var(--text-muted);">In Flow</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% else %}
+      <tr>
+        <td colspan="8" style="text-align: center; color: var(--text-muted); padding: 30px;">
+          No orders received yet today.
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+{{ super() }}
+<script>
+async function adminConfirmOrder(orderId) {
+  try {
+    const res = await fetch(`/admin/order/${orderId}/confirm`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    const data = await res.json();
+    if (data.success) {
+      App.showToast('Order confirmed', 'success');
+      setTimeout(() => location.reload(), 500);
+    } else {
+      App.showToast(data.error || 'Failed to confirm', 'error');
+    }
+  } catch (e) {
+    App.showToast('Network error', 'error');
+  }
+}
+
+async function adminSendKitchen(orderId) {
+  try {
+    const res = await fetch(`/admin/order/${orderId}/send-to-kitchen`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    const data = await res.json();
+    if (data.success) {
+      App.showToast('Order sent to kitchen', 'success');
+      setTimeout(() => location.reload(), 500);
+    } else {
+      App.showToast(data.error || 'Failed to send', 'error');
+    }
+  } catch (e) {
+    App.showToast('Network error', 'error');
+  }
+}
+</script>
+{% endblock %}

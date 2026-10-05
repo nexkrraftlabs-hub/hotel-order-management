@@ -1,0 +1,83 @@
+{% extends "customer/base_customer.html" %}
+
+{% block title %}{{ item.name }} | {{ restaurant.name if restaurant else 'The Royal Feast' }}{% endblock %}
+
+{% block customer_content %}
+<div style="padding-bottom: 90px;">
+  <!-- Item Big Banner -->
+  <div style="position: relative; height: 260px; background: #000;">
+    <a href="javascript:history.back()" 
+       style="position: absolute; top: 16px; left: 16px; z-index: 10; width: 36px; height: 36px; border-radius: 50%; background: rgba(0,0,0,0.5); color: #fff; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(4px);">
+      <i class="bi bi-arrow-left"></i>
+    </a>
+    <img src="{{ item.image if item.image else 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=800&q=80' }}" 
+         alt="{{ item.name }}" style="width: 100%; height: 100%; object-fit: cover;">
+  </div>
+
+  <div style="padding: 20px 16px;">
+    <div class="badge-row">
+      <span class="diet-icon {{ 'veg' if item.is_veg else 'nonveg' }}"></span>
+      <span class="rating-badge"><i class="bi bi-star-fill"></i> {{ "%.1f"|format(item.rating) }}</span>
+      {% if item.is_popular %}<span class="bestseller-badge">Bestseller</span>{% endif %}
+      {% if item.is_spicy %}<span class="badge" style="background: #FEE2E2; color: #DC2626;"><i class="bi bi-fire"></i> Spicy</span>{% endif %}
+    </div>
+
+    <h2 style="font-size: 1.3rem; font-weight: 800; margin: 6px 0;">{{ item.name }}</h2>
+
+    <div class="price-row" style="margin-bottom: 12px;">
+      <span class="current-price" style="font-size: 1.25rem;">₹{{ "%.0f"|format(item.effective_price) }}</span>
+      {% if item.discount_price and item.discount_price < item.price %}
+      <span class="original-price" style="font-size: 0.95rem;">₹{{ "%.0f"|format(item.price) }}</span>
+      <span class="discount-tag" style="font-size: 0.85rem;">{{ item.discount_percentage }}% OFF</span>
+      {% endif %}
+    </div>
+
+    <p style="font-size: 0.88rem; color: var(--text-muted); line-height: 1.6; margin-bottom: 20px;">
+      {{ item.description }}
+    </p>
+
+    <!-- Meta specs -->
+    <div style="background: #F8FAFC; border-radius: var(--radius-md); padding: 14px; border: 1px solid var(--light-border); display: flex; justify-content: space-around; text-align: center; margin-bottom: 24px;">
+      <div>
+        <div style="font-size: 0.72rem; color: var(--text-muted); font-weight: 600;">PREPARATION TIME</div>
+        <div style="font-weight: 800; font-size: 0.95rem; color: var(--text-main); margin-top: 2px;">{{ item.preparation_time }} mins</div>
+      </div>
+      <div style="border-right: 1px solid #E2E8F0;"></div>
+      <div>
+        <div style="font-size: 0.72rem; color: var(--text-muted); font-weight: 600;">CATEGORY</div>
+        <div style="font-weight: 800; font-size: 0.95rem; color: var(--text-main); margin-top: 2px;">{{ item.category.name if item.category else 'Dishes' }}</div>
+      </div>
+    </div>
+
+    <!-- Special cooking instructions -->
+    <div style="margin-bottom: 24px;">
+      <label style="display: block; font-size: 0.85rem; font-weight: 700; margin-bottom: 6px;">
+        <i class="bi bi-chat-left-text"></i> Cooking Notes for Chef
+      </label>
+      <input type="text" id="special-note" placeholder="E.g. Less spicy, no onion, extra crispy" 
+             style="width: 100%; padding: 12px; border-radius: var(--radius-md); border: 1px solid var(--light-border); font-size: 0.88rem; outline: none;">
+    </div>
+
+    <!-- Add button -->
+    <button class="btn-primary-block" id="btn-add-detail" data-item-id="{{ item.id }}" data-cart-url="{{ url_for('customer.cart') }}">
+      <i class="bi bi-bag-plus"></i> Add Item to Cart • ₹{{ "%.0f"|format(item.effective_price) }}
+    </button>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+{{ super() }}
+<script>
+document.getElementById('btn-add-detail')?.addEventListener('click', function() {
+  const itemId = parseInt(this.getAttribute('data-item-id'), 10);
+  const cartUrl = this.getAttribute('data-cart-url') || '/cart';
+  const noteInput = document.getElementById('special-note');
+  const note = noteInput ? noteInput.value : '';
+  CustomerApp.addToCart(itemId, 1, note);
+  setTimeout(() => {
+    window.location.href = cartUrl;
+  }, 400);
+});
+</script>
+{% endblock %}

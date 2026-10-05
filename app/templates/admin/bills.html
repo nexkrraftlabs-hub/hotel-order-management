@@ -1,0 +1,57 @@
+{% extends "admin/base_admin.html" %}
+
+{% block title %}Tax Bills & Invoices | Admin{% endblock %}
+
+{% block admin_content %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+  <div>
+    <h1 style="font-size: 1.4rem; font-weight: 800;">Bills & Invoices Archive</h1>
+    <p style="font-size: 0.85rem; color: var(--text-muted);">View, download, and audit generated tax invoices</p>
+  </div>
+</div>
+
+<div class="data-card">
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Bill No</th>
+        <th>Token</th>
+        <th>Date & Time</th>
+        <th>Subtotal</th>
+        <th>GST</th>
+        <th>Service Chg</th>
+        <th>Grand Total</th>
+        <th>Method</th>
+        <th>Action</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for b in bills %}
+      <tr>
+        <td style="font-weight: 700;">{{ b.bill_number }}</td>
+        <td style="font-weight: 800; color: var(--primary);">#{{ "%02d"|format(b.token_number) if b.token_number else '--' }}</td>
+        <td style="font-size: 0.8rem; color: var(--text-muted);">
+          {{ b.created_at.strftime('%d %b %Y, %I:%M %p') if b.created_at else '' }}
+        </td>
+        <td>₹{{ "%.2f"|format(b.subtotal) }}</td>
+        <td>₹{{ "%.2f"|format(b.tax_amount) }}</td>
+        <td>₹{{ "%.2f"|format(b.service_charge) }}</td>
+        <td style="font-weight: 900; font-size: 0.95rem; color: var(--veg-color);">₹{{ "%.2f"|format(b.total_amount) }}</td>
+        <td><span class="badge" style="background: #F1F5F9; color: var(--text-main);">{{ b.payment_method|upper }}</span></td>
+        <td>
+          <a href="{{ url_for('admin.bill_pdf', bill_id=b.id) }}" class="btn-sm btn-outline" style="text-decoration: none;">
+            <i class="bi bi-file-earmark-pdf"></i> Download PDF
+          </a>
+        </td>
+      </tr>
+      {% else %}
+      <tr>
+        <td colspan="9" style="text-align: center; color: var(--text-muted); padding: 40px;">
+          No bills generated yet. Bills are created automatically when payments are approved.
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

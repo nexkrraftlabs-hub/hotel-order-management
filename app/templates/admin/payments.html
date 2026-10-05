@@ -1,0 +1,204 @@
+{% extends "admin/base_admin.html" %}
+
+{% block title %}Payments & Billing | Admin{% endblock %}
+
+{% block admin_content %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+  <div>
+    <h1 style="font-size: 1.4rem; font-weight: 800;">Payments & Cashier Desk</h1>
+    <p style="font-size: 0.85rem; color: var(--text-muted);">
+      Approve guest payments, complete dining sessions, and release tokens
+    </p>
+  </div>
+</div>
+
+<!-- SECTION 1: SESSIONS WITH PENDING PAYMENT -->
+<div class="data-card" style="margin-bottom: 30px;">
+  <div class="data-card-header" style="background: #FFFBEB;">
+    <h3 style="font-size: 1.05rem; font-weight: 800; color: #92400E; display: flex; align-items: center; gap: 8px;">
+      <i class="bi bi-hourglass-top"></i> Pending Approvals & Active Sessions ({{ pending|length }})
+    </h3>
+  </div>
+
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Token</th>
+        <th>Session ID</th>
+        <th>Guest</th>
+        <th>Orders Count</th>
+        <th>Total Bill Amount</th>
+        <th>Service State</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in pending %}
+      {% set sess = item.session %}
+      <tr>
+        <td style="font-size: 1.2rem; font-weight: 900; color: var(--primary);">
+          #{{ "%02d"|format(sess.token.token_number) if sess.token else '--' }}
+        </td>
+        <td style="font-weight: 600; font-size: 0.85rem;">{{ sess.session_id }}</td>
+        <td>{{ sess.customer_name if sess.customer_name else 'Guest Customer' }}</td>
+        <td>{{ item.orders|length }} orders</td>
+        <td style="font-size: 1.1rem; font-weight: 900; color: var(--text-main);">₹{{ "%.0f"|format(item.total) }}</td>
+        <td>
+          {% if item.has_served %}
+          <span class="badge" style="background: #DCFCE7; color: #166534;"><i class="bi bi-check2"></i> Food Served</span>
+          {% else %}
+          <span class="badge badge-cooking">Cooking / In Progress</span>
+          {% endif %}
+        </td>
+        <td>
+          <button class="btn-sm btn-success" 
+                  data-session-id="{{ sess.id }}" 
+                  data-token="{{ "%02d"|format(sess.token.token_number) if sess.token else '--' }}" 
+                  data-total="{{ item.total }}"
+                  onclick="openPaymentModal(this.getAttribute('data-session-id'), this.getAttribute('data-token'), parseFloat(this.getAttribute('data-total')))">
+            <i class="bi bi-cash-coin"></i> Approve & Settle Bill
+          </button>
+        </td>
+      </tr>
+      {% else %}
+      <tr>
+        <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 30px;">
+          No pending payments. All sessions settled!
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- SECTION 2: COMPLETED PAYMENT TRANSACTIONS -->
+<div class="data-card">
+  <div class="data-card-header">
+    <h3 style="font-size: 1.05rem; font-weight: 800;">Recent Settled Transactions</h3>
+  </div>
+
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Payment Ref</th>
+        <th>Session</th>
+        <th>Method</th>
+        <th>Total Paid</th>
+        <th>Settled At</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for p in completed %}
+      <tr>
+        <td style="font-weight: 700;">{{ p.transaction_id }}</td>
+        <td style="font-size: 0.8rem; color: var(--text-muted);">{{ p.session.session_id if p.session else '--' }}</td>
+        <td>
+          <span class="badge" style="background: #F1F5F9; color: var(--text-main); font-weight: 700;">
+            {{ p.payment_method|upper }}
+          </span>
+        </td>
+        <td style="font-weight: 900; color: var(--veg-color);">₹{{ "%.2f"|format(p.total_amount) }}</td>
+        <td style="color: var(--text-muted); font-size: 0.8rem;">
+          {{ p.paid_at.strftime('%d %b, %I:%M %p') if p.paid_at else '' }}
+        </td>
+        <td>
+          <span class="badge" style="background: #D1FAE5; color: #065F46;">PAID & CLOSED</span>
+        </td>
+      </tr>
+      {% else %}
+      <tr>
+        <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 30px;">
+          No settled payments yet.
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- Payment Approval Modal -->
+<div id="payment-modal" class="modal-backdrop">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h3>Settle Payment & Release Token</h3>
+      <button onclick="closePaymentModal()" style="border: none; background: transparent; font-size: 1.2rem; cursor: pointer;">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div style="background: #F8FAFC; border-radius: var(--radius-md); padding: 14px; text-align: center; margin-bottom: 20px;">
+        <span style="font-size: 0.8rem; color: var(--text-muted); font-weight: 600;">TOKEN NUMBER</span>
+        <div style="font-size: 2rem; font-weight: 900; color: var(--primary);" id="modal-token-num">#--</div>
+        <div style="font-size: 1.2rem; font-weight: 800; color: var(--text-main); margin-top: 4px;" id="modal-total-amt">₹0</div>
+      </div>
+
+      <div style="margin-bottom: 16px;">
+        <label style="display: block; font-size: 0.85rem; font-weight: 700; margin-bottom: 8px;">Select Payment Method:</label>
+        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;">
+          <label style="display: flex; align-items: center; gap: 8px; padding: 10px; border: 1px solid var(--light-border); border-radius: var(--radius-md); cursor: pointer;">
+            <input type="radio" name="pay-method" value="cash" checked> <span>Cash</span>
+          </label>
+          <label style="display: flex; align-items: center; gap: 8px; padding: 10px; border: 1px solid var(--light-border); border-radius: var(--radius-md); cursor: pointer;">
+            <input type="radio" name="pay-method" value="upi"> <span>UPI / QR</span>
+          </label>
+          <label style="display: flex; align-items: center; gap: 8px; padding: 10px; border: 1px solid var(--light-border); border-radius: var(--radius-md); cursor: pointer;">
+            <input type="radio" name="pay-method" value="card"> <span>Debit / Credit Card</span>
+          </label>
+          <label style="display: flex; align-items: center; gap: 8px; padding: 10px; border: 1px solid var(--light-border); border-radius: var(--radius-md); cursor: pointer;">
+            <input type="radio" name="pay-method" value="online"> <span>Online Portal</span>
+          </label>
+        </div>
+      </div>
+
+      <p style="font-size: 0.75rem; color: var(--text-muted);">
+        Approving payment will mark all orders as PAID, generate official tax invoice, mark session as COMPLETED, and instantly release the token back to available state.
+      </p>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-sm btn-outline" onclick="closePaymentModal()">Cancel</button>
+      <button class="btn-sm btn-success" onclick="confirmPaymentApproval()">Confirm & Settle</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+{{ super() }}
+<script>
+let currentSettleSessionId = null;
+
+function openPaymentModal(sessionId, tokenNum, total) {
+  currentSettleSessionId = sessionId;
+  document.getElementById('modal-token-num').textContent = '#' + tokenNum;
+  document.getElementById('modal-total-amt').textContent = '₹' + total.toFixed(2);
+  document.getElementById('payment-modal').classList.add('show');
+}
+
+function closePaymentModal() {
+  document.getElementById('payment-modal').classList.remove('show');
+}
+
+async function confirmPaymentApproval() {
+  if (!currentSettleSessionId) return;
+
+  const method = document.querySelector('input[name="pay-method"]:checked').value;
+
+  try {
+    const res = await fetch(`/admin/payment/approve/${currentSettleSessionId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ payment_method: method })
+    });
+    const data = await res.json();
+    if (data.success) {
+      App.showToast('Payment settled and token released!', 'success');
+      closePaymentModal();
+      setTimeout(() => location.reload(), 500);
+    } else {
+      App.showToast(data.error || 'Failed to approve payment', 'error');
+    }
+  } catch (e) {
+    App.showToast('Network error', 'error');
+  }
+}
+</script>
+{% endblock %}

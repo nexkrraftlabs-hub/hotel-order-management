@@ -1,0 +1,145 @@
+{% extends "customer/base_customer.html" %}
+
+{% block title %}Your Cart | {{ restaurant.name if restaurant else 'The Royal Feast' }}{% endblock %}
+
+{% block customer_content %}
+<div class="cart-page-container">
+
+  <!-- Header -->
+  <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 20px;">
+    <a href="{{ url_for('customer.menu') }}" style="font-size: 1.2rem; color: var(--text-main);"><i class="bi bi-arrow-left"></i></a>
+    <h2 style="font-size: 1.2rem; font-weight: 800;">Review Order</h2>
+  </div>
+
+  <div id="cart-content-wrapper">
+    <!-- Rendered via JS -->
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+{{ super() }}
+<script>
+function renderCartItems() {
+  const container = document.getElementById('cart-content-wrapper');
+  const cart = CustomerApp.cart;
+
+  if (!cart || !cart.items || cart.items.length === 0) {
+    container.innerHTML = `
+      <div style="text-align: center; padding: 60px 20px;">
+        <div style="width: 80px; height: 80px; border-radius: 50%; background: #FEE2E2; color: var(--primary); display: flex; align-items: center; justify-content: center; font-size: 2.2rem; margin: 0 auto 16px;">
+          <i class="bi bi-bag-x"></i>
+        </div>
+        <h3 style="font-size: 1.15rem; font-weight: 800; margin-bottom: 6px;">Your cart is empty</h3>
+        <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 24px;">Explore our curated delicacies and add something delicious!</p>
+        <a href="{{ url_for('customer.menu') }}" class="btn-primary-block" style="text-decoration: none;">
+          <i class="bi bi-menu-button-wide"></i> Browse Full Menu
+        </a>
+      </div>
+    `;
+    return;
+  }
+
+  let itemsHtml = '';
+  cart.items.forEach(ci => {
+    itemsHtml += `
+      <div class="cart-item-row">
+        <div class="cart-item-info">
+          <span class="diet-icon ${ci.is_veg ? 'veg' : 'nonveg'}"></span>
+          <div>
+            <div style="font-weight: 700; font-size: 0.92rem; color: var(--text-main);">${ci.item_name}</div>
+            <div style="font-size: 0.8rem; color: var(--text-muted);">₹${ci.unit_price} each</div>
+          </div>
+        </div>
+
+        <div style="display: flex; align-items: center; gap: 16px;">
+          <div class="qty-stepper" style="width: 80px; height: 30px;">
+            <button class="stepper-btn" onclick="CustomerApp.updateItemQty(${ci.id}, ${ci.quantity - 1})">−</button>
+            <span class="stepper-qty">${ci.quantity}</span>
+            <button class="stepper-btn" onclick="CustomerApp.updateItemQty(${ci.id}, ${ci.quantity + 1})">+</button>
+          </div>
+          <div style="font-weight: 800; font-size: 0.95rem; min-width: 55px; text-align: right;">
+            ₹${ci.line_total}
+          </div>
+        </div>
+      </div>
+    `;
+  });
+
+  const subtotal = cart.subtotal || 0;
+  const tax = Math.round(subtotal * 0.05 * 100) / 100;
+  const serviceCharge = Math.round(subtotal * 0.05 * 100) / 100;
+  const grandTotal = Math.round(subtotal + tax + serviceCharge);
+
+  container.innerHTML = `
+    <!-- Items List Card -->
+    <div style="background: #FFFFFF; border-radius: var(--radius-lg); padding: 6px 16px; border: 1px solid var(--light-border); margin-bottom: 16px;">
+      ${itemsHtml}
+      <div style="padding: 12px 0; text-align: center;">
+        <a href="{{ url_for('customer.menu') }}" style="font-size: 0.82rem; color: var(--primary); font-weight: 700;">
+          + Add More Items
+        </a>
+      </div>
+    </div>
+
+    <!-- Cooking Instructions -->
+    <div style="background: #FFFFFF; border-radius: var(--radius-lg); padding: 14px; border: 1px solid var(--light-border); margin-bottom: 16px;">
+      <label style="display: block; font-size: 0.82rem; font-weight: 700; color: var(--text-main); margin-bottom: 6px;">
+        <i class="bi bi-chat-left-dots"></i> Cooking Instructions / Allergen Info
+      </label>
+      <input type="text" id="cart-special-instructions" placeholder="E.g. Extra spicy, no garlic, bring all together" 
+             style="width: 100%; padding: 10px 12px; border-radius: var(--radius-md); border: 1px solid var(--light-border); font-size: 0.85rem; outline: none;">
+    </div>
+
+    <!-- Token Process Explainer Note -->
+    <div style="background: #EFF6FF; border: 1px solid #BFDBFE; border-radius: var(--radius-md); padding: 12px 14px; margin-bottom: 16px; display: flex; align-items: flex-start; gap: 10px;">
+      <i class="bi bi-info-circle-fill" style="color: #2563EB; font-size: 1.1rem; margin-top: 1px;"></i>
+      <div style="font-size: 0.78rem; color: #1E40AF; line-height: 1.4;">
+        <strong>How Token Ordering Works:</strong> When you place this order, an Order Token will be assigned to you. Keep your token screen open, and the waiter will deliver food directly to you!
+      </div>
+    </div>
+
+    <!-- Bill Summary -->
+    <div class="bill-card">
+      <div style="font-weight: 700; font-size: 0.85rem; color: var(--text-main); margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px;">
+        Bill Summary
+      </div>
+      <div class="bill-row">
+        <span>Item Subtotal</span>
+        <span>₹${subtotal.toFixed(0)}</span>
+      </div>
+      <div class="bill-row">
+        <span>Taxes (GST 5%)</span>
+        <span>₹${tax.toFixed(0)}</span>
+      </div>
+      <div class="bill-row">
+        <span>Service Charge (5%)</span>
+        <span>₹${serviceCharge.toFixed(0)}</span>
+      </div>
+      <div class="bill-row total">
+        <span>Grand Total</span>
+        <span>₹${grandTotal.toFixed(0)}</span>
+      </div>
+    </div>
+
+    <!-- Place Order Button -->
+    <button class="btn-primary-block" onclick="submitOrder()">
+      <span>Place Order & Allocate Token</span>
+      <i class="bi bi-arrow-right-circle-fill"></i>
+    </button>
+  `;
+}
+
+function submitOrder() {
+  const instructions = document.getElementById('cart-special-instructions') ? 
+                         document.getElementById('cart-special-instructions').value : '';
+  CustomerApp.placeOrder(instructions);
+}
+
+// Initial render
+document.addEventListener('DOMContentLoaded', () => {
+  setTimeout(renderCartItems, 200);
+});
+</script>
+{% endblock %}

@@ -1,0 +1,111 @@
+{% extends "customer/base_customer.html" %}
+
+{% block title %}Tax Invoice | {{ bill.bill_number }}{% endblock %}
+
+{% block customer_content %}
+<div style="padding: 16px 16px 100px;">
+
+  <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px;">
+    <a href="{{ url_for('customer.orders') }}" style="font-size: 1.2rem; color: var(--text-main);"><i class="bi bi-arrow-left"></i></a>
+    <h2 style="font-size: 1.15rem; font-weight: 800;">Digital Tax Invoice</h2>
+    <a href="/api/bill/download/{{ session.session_id }}" class="btn-sm btn-outline" title="Download PDF">
+      <i class="bi bi-download"></i> PDF
+    </a>
+  </div>
+
+  <!-- Receipt Card with perforated styling -->
+  <div class="bill-receipt">
+    <div class="receipt-header">
+      <div style="font-size: 0.72rem; font-weight: 800; color: var(--primary); text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 4px;">
+        OFFICIAL TAX INVOICE
+      </div>
+      <h1 class="receipt-title">{{ bill.restaurant_name }}</h1>
+      <p class="receipt-meta">{{ bill.restaurant_address }}</p>
+      <p class="receipt-meta">Phone: {{ bill.restaurant_phone }} • GSTIN: {{ bill.restaurant_gst }}</p>
+    </div>
+
+    <!-- Invoice Details Meta -->
+    <div style="display: flex; justify-content: space-between; font-size: 0.8rem; margin-bottom: 12px; color: var(--text-muted);">
+      <div>
+        <div><strong>Bill No:</strong> {{ bill.bill_number }}</div>
+        <div><strong>Date:</strong> {{ bill.created_at.strftime('%d %b %Y, %I:%M %p') if bill.created_at else '' }}</div>
+      </div>
+      <div style="text-align: right;">
+        <div><strong>Token:</strong> #{{ "%02d"|format(bill.token_number) if bill.token_number else '--' }}</div>
+        <div>
+          <strong>Status:</strong> 
+          <span style="color: var(--veg-color); font-weight: 800; text-transform: uppercase;">{{ bill.payment_status }}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Items Table -->
+    <table class="receipt-table">
+      <thead>
+        <tr>
+          <th>Item</th>
+          <th style="text-align: center;">Qty</th>
+          <th style="text-align: right;">Price</th>
+          <th style="text-align: right;">Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for order in session.orders %}
+          {% for item in order.items %}
+          <tr>
+            <td>
+              <span class="diet-icon {{ 'veg' if item.is_veg else 'nonveg' }}" style="display: inline-block; vertical-align: middle; margin-right: 4px;"></span>
+              {{ item.item_name }}
+            </td>
+            <td style="text-align: center;">{{ item.quantity }}</td>
+            <td style="text-align: right;">₹{{ "%.0f"|format(item.unit_price) }}</td>
+            <td style="text-align: right; font-weight: 700;">₹{{ "%.0f"|format(item.line_total) }}</td>
+          </tr>
+          {% endfor %}
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <!-- Totals Breakdown -->
+    <div class="receipt-totals">
+      <div class="bill-row">
+        <span>Subtotal</span>
+        <span>₹{{ "%.2f"|format(bill.subtotal) }}</span>
+      </div>
+      <div class="bill-row">
+        <span>GST ({{ bill.tax_percent }}%)</span>
+        <span>₹{{ "%.2f"|format(bill.tax_amount) }}</span>
+      </div>
+      <div class="bill-row">
+        <span>Service Charge ({{ bill.service_charge_percent }}%)</span>
+        <span>₹{{ "%.2f"|format(bill.service_charge) }}</span>
+      </div>
+      {% if bill.discount_amount and bill.discount_amount > 0 %}
+      <div class="bill-row" style="color: var(--veg-color);">
+        <span>Discount</span>
+        <span>-₹{{ "%.2f"|format(bill.discount_amount) }}</span>
+      </div>
+      {% endif %}
+      <div class="bill-row total">
+        <span>Amount Paid</span>
+        <span>₹{{ "%.2f"|format(bill.total_amount) }}</span>
+      </div>
+    </div>
+
+    <div style="text-align: center; margin-top: 20px; padding-top: 14px; border-top: 1px dashed var(--light-border);">
+      <div style="font-size: 0.8rem; font-weight: 700; color: var(--text-main);">
+        Paid via: <span style="text-transform: uppercase;">{{ bill.payment_method }}</span>
+      </div>
+      <p style="font-size: 0.72rem; color: var(--text-muted); margin-top: 4px;">Thank you for dining with us! Please visit again.</p>
+    </div>
+  </div>
+
+  <!-- Download PDF Button -->
+  <div style="margin-top: 24px;">
+    <a href="/api/bill/download/{{ session.session_id }}" class="btn-primary-block" style="text-decoration: none;">
+      <i class="bi bi-file-earmark-pdf-fill"></i> Download PDF Receipt
+    </a>
+  </div>
+
+</div>
+{% endblock %}

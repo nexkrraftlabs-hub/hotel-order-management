@@ -1,0 +1,141 @@
+{% extends "customer/base_customer.html" %}
+
+{% block title %}{{ restaurant.name if restaurant else 'The Royal Feast' }} | Welcome{% endblock %}
+
+{% block customer_content %}
+<!-- Search Header Bar -->
+<div class="search-container">
+  <a href="{{ url_for('customer.search') }}" class="search-box" style="text-decoration: none; cursor: pointer; display: flex;">
+    <i class="bi bi-search"></i>
+    <input type="text" placeholder="Search for dishes, kebabs, desserts..." readonly style="cursor: pointer;">
+  </a>
+</div>
+
+<!-- Hero Restaurant Banner -->
+<div style="padding: 0 16px 14px;">
+  <div style="position: relative; height: 160px; border-radius: var(--radius-lg); overflow: hidden; box-shadow: var(--shadow-md);">
+    <img src="{{ restaurant.cover_image if restaurant and restaurant.cover_image else 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=1000&q=80' }}" 
+         alt="Restaurant Ambiance" style="width: 100%; height: 100%; object-fit: cover;">
+    <div style="position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0,0,0,0.1) 0%, rgba(15,23,42,0.85) 100%); display: flex; flex-direction: column; justify-content: flex-end; padding: 16px;">
+      <span style="color: #FCD34D; font-size: 0.75rem; font-weight: 800; text-transform: uppercase; letter-spacing: 1px;">Smart QR Token Ordering</span>
+      <h2 style="color: #FFFFFF; font-size: 1.25rem; font-weight: 800; margin: 2px 0;">Artisanal Flavors & Feast</h2>
+      <p style="color: #CBD5E1; font-size: 0.75rem;">Place your order & your waiter delivers directly with your token #</p>
+    </div>
+  </div>
+</div>
+
+<!-- Categories Section -->
+<div class="categories-section">
+  <div class="section-title">
+    <span>What's on your mind?</span>
+    <a href="{{ url_for('customer.menu') }}" class="see-all">Explore Menu <i class="bi bi-chevron-right"></i></a>
+  </div>
+  <div class="category-scroll-container">
+    {% for cat in categories %}
+    <a href="{{ url_for('customer.menu', category=cat.id) }}" class="category-chip">
+      <div class="chip-img-wrapper">
+        <img src="{{ cat.image if cat.image else 'https://images.unsplash.com/photo-1541544741938-0af808871cc0?w=200&q=80' }}" alt="{{ cat.name }}">
+      </div>
+      <span class="chip-title">{{ cat.name }}</span>
+    </a>
+    {% endfor %}
+  </div>
+</div>
+
+<!-- Dietary Filter Tabs -->
+<div class="filter-tabs">
+  <div class="diet-pill active" data-filter="all">All Dishes</div>
+  <div class="diet-pill" data-filter="veg">
+    <span class="diet-icon veg"></span> Pure Veg
+  </div>
+  <div class="diet-pill" data-filter="nonveg">
+    <span class="diet-icon nonveg"></span> Non-Veg
+  </div>
+</div>
+
+<!-- Featured / Popular Dishes Section -->
+<div class="food-items-container">
+  <div class="section-title" style="margin-bottom: 4px;">
+    <span>Top Recommendations</span>
+    <span style="font-size: 0.75rem; color: var(--text-muted);">Popular Picks</span>
+  </div>
+
+  {% for item in popular_items %}
+  <div class="food-card" data-is-veg="{{ 'true' if item.is_veg else 'false' }}">
+    <div class="food-card-left">
+      <div class="badge-row">
+        <span class="diet-icon {{ 'veg' if item.is_veg else 'nonveg' }}"></span>
+        {% if item.is_popular %}
+        <span class="bestseller-badge">Bestseller</span>
+        {% endif %}
+        <span class="rating-badge">
+          <i class="bi bi-star-fill"></i> {{ "%.1f"|format(item.rating) }}
+        </span>
+      </div>
+
+      <h3 class="food-title">{{ item.name }}</h3>
+
+      <div class="price-row">
+        <span class="current-price">₹{{ "%.0f"|format(item.effective_price) }}</span>
+        {% if item.discount_price and item.discount_price < item.price %}
+        <span class="original-price">₹{{ "%.0f"|format(item.price) }}</span>
+        <span class="discount-tag">{{ item.discount_percentage }}% OFF</span>
+        {% endif %}
+      </div>
+
+      <p class="food-desc">{{ item.description }}</p>
+    </div>
+
+    <div class="food-card-right">
+      <img src="{{ item.image if item.image else 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&q=80' }}" 
+           alt="{{ item.name }}" class="food-thumbnail" loading="lazy">
+      <div class="add-btn-wrapper" data-item-id="{{ item.id }}">
+        <button class="btn-add-food" data-item-id="{{ item.id }}" onclick="CustomerApp.addToCart(this.getAttribute('data-item-id'), 1)">ADD</button>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+
+  {% if featured_items %}
+  <div class="section-title" style="margin-top: 18px; margin-bottom: 4px;">
+    <span>Chef's Signature Creations</span>
+  </div>
+
+  {% for item in featured_items %}
+  {% if item not in popular_items %}
+  <div class="food-card" data-is-veg="{{ 'true' if item.is_veg else 'false' }}">
+    <div class="food-card-left">
+      <div class="badge-row">
+        <span class="diet-icon {{ 'veg' if item.is_veg else 'nonveg' }}"></span>
+        <span class="bestseller-badge" style="background: #E0E7FF; color: #3730A3;">Chef's Special</span>
+        <span class="rating-badge">
+          <i class="bi bi-star-fill"></i> {{ "%.1f"|format(item.rating) }}
+        </span>
+      </div>
+
+      <h3 class="food-title">{{ item.name }}</h3>
+
+      <div class="price-row">
+        <span class="current-price">₹{{ "%.0f"|format(item.effective_price) }}</span>
+        {% if item.discount_price and item.discount_price < item.price %}
+        <span class="original-price">₹{{ "%.0f"|format(item.price) }}</span>
+        <span class="discount-tag">{{ item.discount_percentage }}% OFF</span>
+        {% endif %}
+      </div>
+
+      <p class="food-desc">{{ item.description }}</p>
+    </div>
+
+    <div class="food-card-right">
+      <img src="{{ item.image if item.image else 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&q=80' }}" 
+           alt="{{ item.name }}" class="food-thumbnail" loading="lazy">
+      <div class="add-btn-wrapper" data-item-id="{{ item.id }}">
+        <button class="btn-add-food" data-item-id="{{ item.id }}" onclick="CustomerApp.addToCart(this.getAttribute('data-item-id'), 1)">ADD</button>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+  {% endfor %}
+  {% endif %}
+</div>
+{% endblock %}

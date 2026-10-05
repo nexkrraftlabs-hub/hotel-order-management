@@ -1,0 +1,72 @@
+{% extends "customer/base_customer.html" %}
+
+{% block title %}Search Food | {{ restaurant.name if restaurant else 'The Royal Feast' }}{% endblock %}
+
+{% block customer_content %}
+<div class="search-container" style="padding-top: 14px;">
+  <form action="{{ url_for('customer.search') }}" method="GET" class="search-box">
+    <i class="bi bi-search"></i>
+    <input type="text" name="q" value="{{ query }}" placeholder="Search for biryani, chicken, paneer, naan..." autofocus>
+    {% if query %}
+    <a href="{{ url_for('customer.search') }}" style="color: var(--text-muted);"><i class="bi bi-x-circle-fill"></i></a>
+    {% endif %}
+  </form>
+</div>
+
+<!-- Quick Suggestion Categories -->
+<div style="padding: 0 16px 14px;">
+  <div style="font-size: 0.78rem; font-weight: 700; color: var(--text-muted); margin-bottom: 8px;">POPULAR SEARCHES</div>
+  <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+    {% for term in ['Biryani', 'Tikka', 'Paneer', 'Butter Chicken', 'Pizza', 'Dal Makhani', 'Naan', 'Mocktail'] %}
+    <a href="{{ url_for('customer.search', q=term) }}" 
+       style="background: #F1F5F9; padding: 5px 12px; border-radius: var(--radius-full); font-size: 0.78rem; font-weight: 600; color: var(--text-main);">
+      {{ term }}
+    </a>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="food-items-container">
+  {% if query %}
+    <div class="section-title">
+      <span>Search Results for "{{ query }}"</span>
+      <span style="font-size: 0.8rem; color: var(--text-muted);">{{ items|length }} found</span>
+    </div>
+
+    {% if items %}
+      {% for item in items %}
+      <div class="food-card" data-is-veg="{{ 'true' if item.is_veg else 'false' }}">
+        <div class="food-card-left">
+          <div class="badge-row">
+            <span class="diet-icon {{ 'veg' if item.is_veg else 'nonveg' }}"></span>
+            <span class="rating-badge"><i class="bi bi-star-fill"></i> {{ "%.1f"|format(item.rating) }}</span>
+          </div>
+          <h3 class="food-title">{{ item.name }}</h3>
+          <div class="price-row">
+            <span class="current-price">₹{{ "%.0f"|format(item.effective_price) }}</span>
+            {% if item.discount_price and item.discount_price < item.price %}
+            <span class="original-price">₹{{ "%.0f"|format(item.price) }}</span>
+            <span class="discount-tag">{{ item.discount_percentage }}% OFF</span>
+            {% endif %}
+          </div>
+          <p class="food-desc">{{ item.description }}</p>
+        </div>
+        <div class="food-card-right">
+          <img src="{{ item.image if item.image else 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&q=80' }}" 
+               alt="{{ item.name }}" class="food-thumbnail" loading="lazy">
+          <div class="add-btn-wrapper" data-item-id="{{ item.id }}">
+            <button class="btn-add-food" data-item-id="{{ item.id }}" onclick="CustomerApp.addToCart(this.getAttribute('data-item-id'), 1)">ADD</button>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div style="text-align: center; padding: 40px 20px; color: var(--text-muted);">
+        <i class="bi bi-search" style="font-size: 2.5rem; color: #CBD5E1; display: block; margin-bottom: 10px;"></i>
+        <p style="font-weight: 600;">No items found matching "{{ query }}"</p>
+        <p style="font-size: 0.8rem; margin-top: 4px;">Try searching for something else or browse categories.</p>
+      </div>
+    {% endif %}
+  {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+
+{% block body_class %}kds-body{% endblock %}
+
+{% block body %}
+<div style="display: flex; flex-direction: column; min-height: 100vh;">
+
+  <!-- Kitchen Header -->
+  <header class="kds-header">
+    <div style="display: flex; align-items: center; gap: 14px;">
+      <div style="width: 40px; height: 40px; border-radius: var(--radius-md); background: #EF4444; display: flex; align-items: center; justify-content: center; font-size: 1.3rem; color: #fff;">
+        <i class="bi bi-fire"></i>
+      </div>
+      <div>
+        <h2 style="font-size: 1.15rem; font-weight: 800; color: #FFFFFF; line-height: 1.2;">Kitchen Display System (KDS)</h2>
+        <span style="font-size: 0.75rem; color: #94A3B8;">Chef: {{ current_user.full_name }}</span>
+      </div>
+    </div>
+
+    <div style="display: flex; align-items: center; gap: 16px;">
+      <div id="kds-clock" style="font-size: 1rem; font-weight: 800; color: #FCD34D; font-variant-numeric: tabular-nums;">
+        --:--:--
+      </div>
+      <button class="btn-sm btn-outline" style="color: #fff; border-color: #374151;" onclick="testSound()" title="Test Bell Sound">
+        <i class="bi bi-volume-up-fill"></i> Sound Test
+      </button>
+      <a href="{{ url_for('auth.logout') }}" class="btn-sm btn-outline" style="color: #EF4444; border-color: #EF4444;" title="Sign Out">
+        <i class="bi bi-box-arrow-right"></i> Logout
+      </a>
+    </div>
+  </header>
+
+  <!-- KDS Content Area -->
+  <div style="flex: 1; display: flex; flex-direction: column;">
+    {% block kitchen_content %}{% endblock %}
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+// Live clock in KDS header
+setInterval(() => {
+  const el = document.getElementById('kds-clock');
+  if (el) el.textContent = new Date().toLocaleTimeString();
+}, 1000);
+
+function testSound() {
+  App.playChime('warning');
+  App.showToast('Kitchen bell sound tested', 'info');
+}
+
+// Connect socket to kitchen room
+document.addEventListener('DOMContentLoaded', () => {
+  if (window.App) {
+    const socket = App.initSocket('kitchen');
+    if (socket) {
+      socket.on('new_order', (data) => {
+        App.playChime('warning');
+        App.showToast(`🔥 New Order Received! Token #${data.token || '--'}`, 'warning');
+        if (typeof reloadKDS === 'function') reloadKDS();
+      });
+      socket.on('order_update', () => {
+        if (typeof reloadKDS === 'function') reloadKDS();
+      });
+    }
+  }
+});
+</script>
+{% endblock %}

@@ -1,0 +1,92 @@
+{% extends "admin/base_admin.html" %}
+
+{% block title %}Live Orders Monitor | Admin{% endblock %}
+
+{% block admin_content %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+  <div>
+    <h1 style="font-size: 1.4rem; font-weight: 800;">Real-Time Order Monitor</h1>
+    <p style="font-size: 0.85rem; color: var(--text-muted);">Live pulse of all active orders from customer placement to waiter delivery</p>
+  </div>
+  <button class="btn-sm btn-outline" onclick="location.reload()">
+    <i class="bi bi-arrow-clockwise"></i> Refresh Now
+  </button>
+</div>
+
+<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 18px;">
+  {% for o in orders %}
+  <div style="background: #FFFFFF; border-radius: var(--radius-lg); border: 1px solid var(--light-border); box-shadow: var(--shadow-sm); padding: 18px; position: relative;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 1px solid var(--light-border); padding-bottom: 10px;">
+      <div>
+        <span style="font-size: 0.72rem; color: var(--text-muted); font-weight: 700;">ASSIGNED TOKEN</span>
+        <div style="font-size: 1.4rem; font-weight: 900; color: var(--primary);">
+          #{{ "%02d"|format(o.session.token.token_number) if o.session and o.session.token else '--' }}
+        </div>
+      </div>
+      <div style="text-align: right;">
+        {% if o.status in ['preparing', 'kitchen_accepted'] %}
+        <span class="badge badge-cooking">{{ o.status_display }}</span>
+        {% elif o.status == 'ready' %}
+        <span class="badge badge-ready">{{ o.status_display }}</span>
+        {% elif o.status == 'served' %}
+        <span class="badge badge-served">{{ o.status_display }}</span>
+        {% else %}
+        <span class="badge badge-pending">{{ o.status_display }}</span>
+        {% endif %}
+        <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">
+          {{ o.created_at.strftime('%I:%M %p') if o.created_at else '' }}
+        </div>
+      </div>
+    </div>
+
+    <div style="font-size: 0.82rem; font-weight: 700; color: var(--text-main); margin-bottom: 6px;">
+      Order: {{ o.order_id }}
+    </div>
+
+    <ul style="list-style: none; margin-bottom: 14px; font-size: 0.85rem;">
+      {% for it in o.items %}
+      <li style="display: flex; justify-content: space-between; padding: 3px 0;">
+        <span>{{ it.quantity }}x {{ it.item_name }}</span>
+        <span style="font-weight: 700;">₹{{ "%.0f"|format(it.line_total) }}</span>
+      </li>
+      {% endfor %}
+    </ul>
+
+    {% if o.special_instructions %}
+    <div style="background: #FEF3C7; color: #92400E; border-radius: var(--radius-sm); padding: 6px 10px; font-size: 0.75rem; margin-bottom: 14px;">
+      <strong>Note:</strong> {{ o.special_instructions }}
+    </div>
+    {% endif %}
+
+    <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px dashed var(--light-border); padding-top: 10px; font-size: 0.88rem;">
+      <span style="color: var(--text-muted);">Total Amount</span>
+      <span style="font-weight: 800; font-size: 1.05rem; color: var(--text-main);">₹{{ "%.0f"|format(o.total_amount) }}</span>
+    </div>
+
+    <div style="margin-top: 12px; display: flex; gap: 8px;">
+      {% if o.status == 'pending' %}
+      <button class="btn-sm btn-primary" style="flex: 1; justify-content: center;" data-id="{{ o.id }}" onclick="adminConfirmOrder(this.getAttribute('data-id'))">Confirm Order</button>
+      {% elif o.status == 'confirmed' %}
+      <button class="btn-sm btn-success" style="flex: 1; justify-content: center;" data-id="{{ o.id }}" onclick="adminSendKitchen(this.getAttribute('data-id'))">Send to Kitchen</button>
+      {% endif %}
+    </div>
+  </div>
+  {% else %}
+  <div style="grid-column: 1 / -1; background: #FFFFFF; border-radius: var(--radius-lg); padding: 50px; text-align: center; color: var(--text-muted); border: 1px solid var(--light-border);">
+    <i class="bi bi-broadcast" style="font-size: 2.5rem; color: #CBD5E1; display: block; margin-bottom: 12px;"></i>
+    <h3 style="font-size: 1.1rem; font-weight: 700;">No Active Live Orders</h3>
+    <p style="font-size: 0.85rem; margin-top: 4px;">Orders placed by customers will automatically show up here.</p>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+{{ super() }}
+<script>
+// Auto reload every 5 seconds
+setInterval(() => {
+  // Can fetch JSON or soft reload
+}, 5000);
+</script>
+{% endblock %}
