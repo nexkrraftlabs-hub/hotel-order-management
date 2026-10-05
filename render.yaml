@@ -7,6 +7,8 @@ services:
     buildCommand: pip install -r requirements.txt && python seed.py
     startCommand: gunicorn --worker-class eventlet -w 1 run:app
     envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
       - key: FLASK_ENV
         value: production
       - key: SECRET_KEY
