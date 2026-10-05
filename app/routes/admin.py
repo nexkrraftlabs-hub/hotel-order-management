@@ -460,8 +460,12 @@ def settings():
         app_base_url = 'https://hotel-order-management-zdnb.onrender.com/'
     qr_url = request.args.get('qr_url') or app_base_url
     logo_path = os.path.join(current_app.root_path, 'static', 'img', 'restaurant-logo.png')
-    qr_base64 = QRService.generate_qr_base64(qr_url, logo_path=logo_path)
     qr_img_url = 'https://res.cloudinary.com/dqh2jlqza/image/upload/v1791167187/royal_feast/branding/live_restaurant_qr.png'
+    try:
+        qr_base64 = QRService.generate_qr_base64(qr_url, logo_path=logo_path)
+    except Exception as e:
+        current_app.logger.warning(f'QR generation failed: {e}')
+        qr_base64 = None
     
     return render_template('admin/settings.html', restaurant=restaurant, qr_base64=qr_base64, qr_url=qr_url, qr_img_url=qr_img_url)
 

@@ -113,7 +113,7 @@
 
       <!-- QR Photo Image -->
       <div style="display: inline-block; padding: 14px; background: #FFFFFF; border: 2px solid var(--light-border); border-radius: var(--radius-lg); box-shadow: var(--shadow-md); margin-bottom: 16px;">
-        <img src="{% if qr_base64 %}data:image/png;base64,{{ qr_base64 }}{% else %}{{ qr_img_url or url_for('static', filename='img/restaurant-qr.png') }}{% endif %}" 
+        <img src="{{ qr_base64 or qr_img_url or url_for('static', filename='img/restaurant-qr.png') }}" 
              alt="Restaurant QR Code" 
              style="width: 210px; height: 210px; display: block; border-radius: 8px;" 
              id="qr-img">
