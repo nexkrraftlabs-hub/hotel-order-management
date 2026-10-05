@@ -104,20 +104,33 @@
       </p>
 
       {% if qr_base64 %}
+      <div style="display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 12px;">
+        <img src="{{ restaurant.logo or url_for('static', filename='img/restaurant-logo.png') }}" 
+             id="standee-logo"
+             alt="{{ restaurant.name }}" 
+             style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover; border: 2px solid var(--primary); box-shadow: 0 2px 6px rgba(0,0,0,0.1);">
+        <span style="font-size: 0.88rem; font-weight: 800; color: var(--text-main);">{{ restaurant.name }}</span>
+      </div>
+
       <div style="display: inline-block; padding: 14px; background: #FFFFFF; border: 2px solid var(--light-border); border-radius: var(--radius-lg); box-shadow: var(--shadow-md); margin-bottom: 16px;">
-        <img src="data:image/png;base64,{{ qr_base64 }}" alt="Restaurant QR Code" style="width: 200px; height: 200px; display: block;" id="qr-img">
+        <img src="data:image/png;base64,{{ qr_base64 }}" alt="Restaurant QR Code" style="width: 210px; height: 210px; display: block;" id="qr-img">
       </div>
       {% endif %}
 
-      <div style="font-size: 0.8rem; font-weight: 700; color: var(--primary); margin-bottom: 6px;">
-        Table-less Order Token System
+      <div style="font-size: 0.82rem; font-weight: 800; color: var(--primary); margin-bottom: 6px;">
+        <i class="bi bi-qr-code-scan"></i> Smart Branded QR Code
       </div>
-      <div style="font-size: 0.72rem; color: var(--text-muted); word-break: break-all; background: #F1F5F9; padding: 6px 10px; border-radius: 6px; margin-bottom: 14px;">
-        <i class="bi bi-link-45deg"></i> {{ qr_url }}
+      
+      <!-- Live Destination URL Display -->
+      <div style="margin-bottom: 14px; background: #F8FAFC; border: 1px solid var(--light-border); border-radius: var(--radius-md); padding: 8px 12px; text-align: center;">
+        <div style="font-size: 0.68rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Live Customer Ordering Destination</div>
+        <a href="{{ qr_url }}" target="_blank" rel="noopener noreferrer" style="font-size: 0.82rem; font-weight: 700; color: var(--primary); text-decoration: none; word-break: break-all; display: inline-flex; align-items: center; justify-content: center; gap: 4px;">
+          <i class="bi bi-link-45deg" style="font-size: 1rem;"></i> {{ qr_url }} <i class="bi bi-box-arrow-up-right" style="font-size: 0.72rem;"></i>
+        </a>
       </div>
 
       <p style="font-size: 0.75rem; color: var(--text-muted); text-align: left; line-height: 1.4; margin-bottom: 16px;">
-        Print this master QR code and place it on table stands, acrylic holders, or at the entrance. Each dining customer automatically receives a reusable Token # when placing an order.
+        Ye master QR code customer table stands ya entrance par lagayein. Restaurant logo center me embedded hai aur scan karne par seedha menu khulega.
       </p>
 
       <div style="display: flex; flex-direction: column; gap: 8px;">
@@ -139,27 +152,33 @@
 <script>
 function printQR() {
   const qrImg = document.getElementById('qr-img');
+  const logoImg = document.getElementById('standee-logo');
   if (!qrImg) return;
+  const logoSrc = logoImg ? logoImg.src : '';
   const printWindow = window.open('', '_blank');
   printWindow.document.write(`
     <html>
       <head>
         <title>Print QR Code - The Royal Feast</title>
         <style>
-          body { font-family: sans-serif; text-align: center; padding: 40px; }
-          .card { border: 2px solid #000; border-radius: 16px; padding: 30px; display: inline-block; max-width: 320px; }
-          h2 { margin: 0 0 6px 0; font-size: 24px; }
-          p { margin: 4px 0 16px; color: #555; font-size: 14px; }
-          img { width: 220px; height: 220px; }
-          .footer { font-size: 12px; font-weight: bold; margin-top: 16px; color: #E23744; text-transform: uppercase; }
+          body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: center; padding: 40px; background: #FFF; }
+          .card { border: 2.5px solid #0F172A; border-radius: 20px; padding: 32px 28px; display: inline-block; max-width: 340px; box-shadow: 0 8px 24px rgba(0,0,0,0.08); }
+          .logo { width: 56px; height: 56px; border-radius: 50%; object-fit: cover; margin-bottom: 8px; border: 2px solid #E23744; }
+          h2 { margin: 0 0 6px 0; font-size: 22px; font-weight: 800; color: #0F172A; }
+          p { margin: 4px 0 16px; color: #64748B; font-size: 13px; font-weight: 500; }
+          img.qr { width: 230px; height: 230px; display: block; margin: 0 auto; border-radius: 12px; }
+          .url-box { margin-top: 12px; font-size: 12px; font-weight: 700; color: #E23744; word-break: break-all; background: #F8FAFC; padding: 6px 10px; border-radius: 6px; }
+          .footer { font-size: 11px; font-weight: 800; margin-top: 14px; color: #0F172A; text-transform: uppercase; letter-spacing: 0.5px; }
         </style>
       </head>
       <body>
         <div class="card">
+          ${logoSrc ? `<img src="${logoSrc}" class="logo">` : ''}
           <h2>{{ restaurant.name }}</h2>
-          <p>Scan to view menu, order food & get token</p>
-          <img src="${qrImg.src}">
-          <div class="footer">Contactless Dining • Smart Token</div>
+          <p>Scan with camera to order food & receive your token</p>
+          <img src="${qrImg.src}" class="qr">
+          <div class="url-box">{{ qr_url }}</div>
+          <div class="footer">Contactless Dining • Smart Token System</div>
         </div>
         <script>
           window.onload = function() { window.print(); window.close(); }

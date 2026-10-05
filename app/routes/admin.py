@@ -447,10 +447,11 @@ def settings():
         flash('Settings updated successfully.', 'success')
         return redirect(url_for('admin.settings'))
     
-    # Generate QR code pointing to live production URL (Render)
-    app_base_url = current_app.config.get('APP_BASE_URL') or os.environ.get('APP_BASE_URL') or 'https://the-royal-feast.onrender.com'
+    # Generate QR code pointing to live production URL (Render) with embedded logo
+    app_base_url = current_app.config.get('APP_BASE_URL') or os.environ.get('APP_BASE_URL') or 'https://hotel-order-management-zdnb.onrender.com/'
     qr_url = request.args.get('qr_url') or app_base_url
-    qr_base64 = QRService.generate_qr_base64(qr_url)
+    logo_path = os.path.join(current_app.root_path, 'static', 'img', 'restaurant-logo.png')
+    qr_base64 = QRService.generate_qr_base64(qr_url, logo_path=logo_path)
     
     return render_template('admin/settings.html', restaurant=restaurant, qr_base64=qr_base64, qr_url=qr_url)
 
@@ -460,9 +461,10 @@ def settings():
 def download_qr():
     """Download the high-resolution QR code PNG image for printing table/standee boards."""
     from flask import send_file
-    app_base_url = current_app.config.get('APP_BASE_URL') or os.environ.get('APP_BASE_URL') or 'https://the-royal-feast.onrender.com'
+    app_base_url = current_app.config.get('APP_BASE_URL') or os.environ.get('APP_BASE_URL') or 'https://hotel-order-management-zdnb.onrender.com/'
     qr_url = request.args.get('qr_url') or app_base_url
-    buffer = QRService.generate_qr(qr_url, size=15)
+    logo_path = os.path.join(current_app.root_path, 'static', 'img', 'restaurant-logo.png')
+    buffer = QRService.generate_qr(qr_url, size=15, logo_path=logo_path)
     return send_file(
         buffer,
         mimetype='image/png',

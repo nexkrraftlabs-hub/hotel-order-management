@@ -49,9 +49,9 @@ with app.app_context():
         logo_url = res.get('secure_url')
         print(f" -> Logo uploaded: {logo_url}")
 
-    # 2. Upload Master Restaurant QR Code
-    app_base_url = os.environ.get('APP_BASE_URL') or 'https://the-royal-feast.onrender.com'
-    qr_buffer = QRService.generate_qr(app_base_url)
+    # 2. Upload Master Restaurant QR Code with embedded logo
+    app_base_url = os.environ.get('APP_BASE_URL') or 'https://hotel-order-management-zdnb.onrender.com/'
+    qr_buffer = QRService.generate_qr(app_base_url, logo_path=logo_path)
     res_qr = cloudinary.uploader.upload(
         qr_buffer,
         folder='royal_feast/branding',
