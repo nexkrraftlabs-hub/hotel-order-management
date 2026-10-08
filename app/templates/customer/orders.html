@@ -28,16 +28,20 @@
 <script>
 const STATUS_STAGES = [
   { key: 'pending', label: 'Order Placed', desc: 'Order received by restaurant', icon: 'bi-check-circle' },
-  { key: 'confirmed', label: 'Order Confirmed', desc: 'Manager approved the order', icon: 'bi-clipboard-check' },
-  { key: 'sent_to_kitchen', label: 'Sent to Kitchen', desc: 'Transferred to master chef', icon: 'bi-send' },
-  { key: 'kitchen_accepted', label: 'Chef Accepted', desc: 'Station assigned', icon: 'bi-person-check' },
-  { key: 'preparing', label: 'Food Preparing', desc: 'Sizzling on the stoves', icon: 'bi-fire' },
-  { key: 'ready', label: 'Dish Ready', desc: 'Plated and garnished', icon: 'bi-bell' },
-  { key: 'transferred_to_waiter', label: 'Handed to Waiter', desc: 'Waiter picked up your plate', icon: 'bi-person-walking' },
-  { key: 'serving', label: 'Being Served', desc: 'Waiter arriving at your token spot', icon: 'bi-cup-hot' },
+  { key: 'preparing', label: 'Food Preparing', desc: 'Admin approved & kitchen is preparing', icon: 'bi-fire' },
   { key: 'served', label: 'Served to You', desc: 'Bon Appétit! Enjoy your meal', icon: 'bi-check2-all' },
-  { key: 'paid', label: 'Payment Completed', desc: 'Thank you for dining with us', icon: 'bi-cash-coin' }
+  { key: 'paid', label: 'Payment Completed', desc: 'Payment approved & final bill generated', icon: 'bi-cash-coin' }
 ];
+
+function getCustomerStageKey(status) {
+  if (['confirmed', 'sent_to_kitchen', 'kitchen_accepted', 'preparing', 'ready', 'transferred_to_waiter', 'serving'].includes(status)) {
+    return 'preparing';
+  }
+  if (['payment_pending', 'paid', 'completed'].includes(status)) {
+    return 'paid';
+  }
+  return status;
+}
 
 async function loadCustomerOrders() {
   const container = document.getElementById('orders-container');
@@ -70,7 +74,7 @@ async function loadCustomerOrders() {
             ${data.session_status === 'completed' ? 'Session Completed' : 'Active Dining Session'}
           </div>
           <p style="font-size: 0.75rem; color: #94A3B8; margin-top: 8px;">
-            The waiter will deliver food using this token number.
+            Food will be served at your token spot.
           </p>
         </div>
       `;
@@ -78,9 +82,10 @@ async function loadCustomerOrders() {
 
     let ordersHtml = '';
     data.orders.forEach((order, idx) => {
-      // Find current stage index
-      const stageIdx = STATUS_STAGES.findIndex(s => s.key === order.status);
-      const isPaid = order.payment_status === 'paid' || order.status === 'paid';
+      // Find current stage index mapped to customer process
+      const activeStageKey = getCustomerStageKey(order.status);
+      const stageIdx = STATUS_STAGES.findIndex(s => s.key === activeStageKey);
+      const isPaid = order.payment_status === 'paid' || order.status === 'paid' || order.status === 'completed';
 
       let timelineHtml = '';
       STATUS_STAGES.forEach((stage, sIdx) => {
@@ -106,6 +111,25 @@ async function loadCustomerOrders() {
 
       let itemsSummary = order.items.map(it => `${it.quantity}x ${it.item_name}`).join(', ');
 
+      let badgeClass = 'confirmed';
+      let displayStatus = 'Order Placed';
+      if (order.status === 'served') {
+        badgeClass = 'served';
+        displayStatus = 'Served';
+      } else if (isPaid) {
+        badgeClass = 'paid';
+        displayStatus = 'Paid';
+      } else if (order.status === 'cancelled') {
+        badgeClass = 'cancelled';
+        displayStatus = 'Cancelled';
+      } else if (['preparing', 'confirmed', 'sent_to_kitchen', 'kitchen_accepted', 'ready', 'transferred_to_waiter', 'serving'].includes(order.status)) {
+        badgeClass = 'cooking';
+        displayStatus = 'Preparing';
+      } else if (order.status === 'pending') {
+        badgeClass = 'pending';
+        displayStatus = 'Pending Approval';
+      }
+
       ordersHtml += `
         <div style="background: #FFFFFF; border-radius: var(--radius-lg); border: 1px solid var(--light-border); box-shadow: var(--shadow-sm); padding: 18px; margin-bottom: 20px;">
           <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--light-border); padding-bottom: 12px; margin-bottom: 14px;">
@@ -114,8 +138,8 @@ async function loadCustomerOrders() {
               <div style="font-weight: 800; font-size: 0.95rem; color: var(--text-main);">${order.order_id}</div>
             </div>
             <div style="text-align: right;">
-              <span class="badge badge-${order.status === 'served' ? 'served' : order.status === 'preparing' ? 'cooking' : 'confirmed'}">
-                ${order.status_display}
+              <span class="badge badge-${badgeClass}">
+                ${displayStatus}
               </span>
               <div style="font-size: 0.9rem; font-weight: 800; color: var(--text-main); margin-top: 3px;">₹${order.total_amount}</div>
             </div>
@@ -133,22 +157,31 @@ async function loadCustomerOrders() {
       `;
     });
 
+    const isSessionPaid = data.session_status === 'completed' || (data.orders.length > 0 && data.orders.every(o => o.payment_status === 'paid' || o.status === 'paid' || o.status === 'completed'));
+    const hasBill = data.has_bill || isSessionPaid;
     const actionButtons = `
       <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 24px;">
-        <a href="{{ url_for('customer.menu') }}" class="btn-primary-block" style="text-decoration: none; background: #0F172A;">
-          <i class="bi bi-plus-circle"></i> Add More Food (Same Token)
-        </a>
-        ${data.session_id ? `
+        ${!isSessionPaid ? `
+          <a href="{{ url_for('customer.menu') }}" class="btn-primary-block" style="text-decoration: none; background: #0F172A;">
+            <i class="bi bi-plus-circle"></i> Add More Food (Same Token)
+          </a>
+        ` : ''}
+        ${hasBill && data.session_id ? `
           <a href="/bill/${data.session_id}" class="btn-primary-block" style="text-decoration: none; background: var(--veg-color);">
             <i class="bi bi-receipt"></i> View Digital Bill
           </a>
-        ` : ''}
+        ` : `
+          <div style="text-align: center; padding: 12px 16px; font-size: 0.8rem; color: var(--text-muted); background: #F8FAFC; border-radius: var(--radius-md); border: 1px dashed var(--light-border);">
+            <i class="bi bi-info-circle"></i> Digital Bill will be available once payment is approved by Admin.
+          </div>
+        `}
       </div>
     `;
 
     container.innerHTML = tokenHtml + ordersHtml + actionButtons;
 
   } catch (err) {
+    console.error('Failed to load customer orders:', err);
     container.innerHTML = `<div style="text-align: center; color: red;">Failed to load order tracking.</div>`;
   }
 }

@@ -67,7 +67,7 @@ class PaymentService:
         
         # Step 2: Mark all orders as PAID
         for order in session.orders.all():
-            if order.status == Order.SERVED:
+            if order.status in [Order.SERVED, Order.PREPARING, Order.CONFIRMED, Order.PENDING, Order.READY, Order.SERVING]:
                 order.status = Order.PAID
                 order.paid_at = datetime.now(timezone.utc)
             order.payment_status = 'paid'

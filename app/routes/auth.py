@@ -72,10 +72,6 @@ def logout():
 
 def redirect_by_role(user):
     """Redirect user to appropriate dashboard based on role."""
-    if user.is_admin or user.is_super_admin:
+    if user.is_admin or user.is_super_admin or user.is_kitchen or user.is_waiter:
         return redirect(url_for('admin.dashboard'))
-    elif user.is_kitchen:
-        return redirect(url_for('kitchen.dashboard'))
-    elif user.is_waiter:
-        return redirect(url_for('waiter.dashboard'))
     return redirect(url_for('customer.home'))

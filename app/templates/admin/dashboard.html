@@ -104,15 +104,15 @@
     </div>
     <div style="padding: 12px; background: #FFEDD5; border-radius: var(--radius-md);">
       <div style="font-size: 1.5rem; font-weight: 900; color: #9A3412;">{{ order_stats.preparing_orders }}</div>
-      <div style="font-size: 0.75rem; font-weight: 700; color: #C2410C;">In Kitchen</div>
-    </div>
-    <div style="padding: 12px; background: #DCFCE7; border-radius: var(--radius-md);">
-      <div style="font-size: 1.5rem; font-weight: 900; color: #166534;">{{ order_stats.ready_orders }}</div>
-      <div style="font-size: 0.75rem; font-weight: 700; color: #15803D;">Ready for Waiter</div>
+      <div style="font-size: 0.75rem; font-weight: 700; color: #C2410C;">Food Preparing</div>
     </div>
     <div style="padding: 12px; background: #F3E8FF; border-radius: var(--radius-md);">
       <div style="font-size: 1.5rem; font-weight: 900; color: #6B21A8;">{{ order_stats.served_orders }}</div>
       <div style="font-size: 0.75rem; font-weight: 700; color: #7E22CE;">Served to Token</div>
+    </div>
+    <div style="padding: 12px; background: #DCFCE7; border-radius: var(--radius-md);">
+      <div style="font-size: 1.5rem; font-weight: 900; color: #166534;">{{ order_stats.total_orders }}</div>
+      <div style="font-size: 0.75rem; font-weight: 700; color: #15803D;">Total Orders</div>
     </div>
   </div>
 </div>
@@ -148,15 +148,15 @@
         <td style="font-weight: 800;">₹{{ "%.0f"|format(o.total_amount) }}</td>
         <td>
           {% if o.status == 'pending' %}
-          <span class="badge badge-pending">{{ o.status_display }}</span>
-          {% elif o.status in ['preparing', 'kitchen_accepted'] %}
-          <span class="badge badge-cooking">{{ o.status_display }}</span>
-          {% elif o.status == 'ready' %}
-          <span class="badge badge-ready">{{ o.status_display }}</span>
+          <span class="badge badge-pending">Pending Approval</span>
+          {% elif o.status in ['preparing', 'confirmed', 'sent_to_kitchen', 'kitchen_accepted', 'ready'] %}
+          <span class="badge badge-cooking">Preparing</span>
           {% elif o.status == 'served' %}
-          <span class="badge badge-served">{{ o.status_display }}</span>
-          {% elif o.status == 'paid' %}
-          <span class="badge badge-paid">{{ o.status_display }}</span>
+          <span class="badge badge-served">Served</span>
+          {% elif o.status == 'paid' or o.payment_status == 'paid' %}
+          <span class="badge badge-paid">Paid</span>
+          {% elif o.status == 'cancelled' %}
+          <span class="badge badge-cancelled">Cancelled</span>
           {% else %}
           <span class="badge badge-confirmed">{{ o.status_display }}</span>
           {% endif %}
@@ -172,13 +172,27 @@
           {{ o.created_at.strftime('%I:%M %p') if o.created_at else '' }}
         </td>
         <td>
+          <div style="display: flex; gap: 6px; align-items: center;">
           {% if o.status == 'pending' %}
-          <button class="btn-sm btn-primary" data-id="{{ o.id }}" onclick="adminConfirmOrder(this.getAttribute('data-id'))">Confirm</button>
-          {% elif o.status == 'confirmed' %}
-          <button class="btn-sm btn-success" data-id="{{ o.id }}" onclick="adminSendKitchen(this.getAttribute('data-id'))">Send to Kitchen</button>
+            <button class="btn-sm btn-primary" data-id="{{ o.id }}" onclick="adminApproveOrder(this.getAttribute('data-id'))" title="Approve order & start preparing">
+              <i class="bi bi-check-circle"></i> Approve
+            </button>
+          {% elif o.status in ['preparing', 'confirmed', 'sent_to_kitchen', 'kitchen_accepted', 'ready'] %}
+            <button class="btn-sm btn-success" data-id="{{ o.id }}" onclick="adminServeOrder(this.getAttribute('data-id'))" title="Mark order as served">
+              <i class="bi bi-check2-circle"></i> Mark Served
+            </button>
+          {% elif o.status == 'served' and o.payment_status != 'paid' %}
+            <button class="btn-sm" style="background: #F59E0B; color: #fff;" data-session-id="{{ o.session_id }}" onclick="adminApprovePayment(this.getAttribute('data-session-id'))" title="Approve payment & generate bill">
+              <i class="bi bi-cash-coin"></i> Approve Payment
+            </button>
+          {% elif o.payment_status == 'paid' or o.status == 'paid' %}
+            <a href="{{ url_for('admin.bills') }}" class="btn-sm btn-outline" style="color: #059669; text-decoration: none;" title="View Bill">
+              <i class="bi bi-receipt"></i> Bill Ready
+            </a>
           {% else %}
-          <span style="font-size: 0.78rem; color: var(--text-muted);">In Flow</span>
+            <span style="font-size: 0.78rem; color: var(--text-muted);">In Flow</span>
           {% endif %}
+          </div>
         </td>
       </tr>
       {% else %}
@@ -196,36 +210,56 @@
 {% block extra_scripts %}
 {{ super() }}
 <script>
-async function adminConfirmOrder(orderId) {
+async function adminApproveOrder(orderId) {
   try {
-    const res = await fetch(`/admin/order/${orderId}/confirm`, {
+    const res = await fetch(`/admin/order/${orderId}/approve`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' }
     });
     const data = await res.json();
     if (data.success) {
-      App.showToast('Order confirmed', 'success');
-      setTimeout(() => location.reload(), 500);
+      App.showToast('Order approved & food preparing', 'success');
+      setTimeout(() => location.reload(), 400);
     } else {
-      App.showToast(data.error || 'Failed to confirm', 'error');
+      App.showToast(data.error || 'Failed to approve', 'error');
     }
   } catch (e) {
     App.showToast('Network error', 'error');
   }
 }
 
-async function adminSendKitchen(orderId) {
+async function adminServeOrder(orderId) {
   try {
-    const res = await fetch(`/admin/order/${orderId}/send-to-kitchen`, {
+    const res = await fetch(`/admin/order/${orderId}/serve`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' }
     });
     const data = await res.json();
     if (data.success) {
-      App.showToast('Order sent to kitchen', 'success');
-      setTimeout(() => location.reload(), 500);
+      App.showToast('Order marked as served', 'success');
+      setTimeout(() => location.reload(), 400);
     } else {
-      App.showToast(data.error || 'Failed to send', 'error');
+      App.showToast(data.error || 'Failed to serve', 'error');
+    }
+  } catch (e) {
+    App.showToast('Network error', 'error');
+  }
+}
+
+async function adminApprovePayment(sessionId) {
+  if (!confirm('Approve payment for this dining session and generate final bill?')) return;
+  try {
+    const res = await fetch(`/admin/payment/approve/${sessionId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ payment_method: 'cash' })
+    });
+    const data = await res.json();
+    if (data.success) {
+      App.showToast('Payment approved & bill generated', 'success');
+      setTimeout(() => location.reload(), 400);
+    } else {
+      App.showToast(data.error || 'Failed to approve payment', 'error');
     }
   } catch (e) {
     App.showToast('Network error', 'error');

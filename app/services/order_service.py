@@ -114,6 +114,27 @@ class OrderService:
         return order
     
     @staticmethod
+    def approve_order(order_id):
+        """Admin approves order, putting it directly into preparing state."""
+        order = db.session.get(Order, order_id)
+        if not order:
+            raise ValueError('Order not found')
+        if order.status in [Order.PENDING, Order.CONFIRMED, Order.SENT_TO_KITCHEN, Order.KITCHEN_ACCEPTED]:
+            return OrderService.update_order_status(order_id, Order.PREPARING)
+        return order
+
+    @staticmethod
+    def cancel_order(order_id, reason=None):
+        """Cancel an order."""
+        order = db.session.get(Order, order_id)
+        if not order:
+            raise ValueError('Order not found')
+        order.transition_to(Order.CANCELLED)
+        db.session.commit()
+        NotificationService.notify_order_status_change(order.session, order, Order.CANCELLED)
+        return order
+
+    @staticmethod
     def confirm_order(order_id):
         """Admin confirms an order."""
         return OrderService.update_order_status(order_id, Order.CONFIRMED)

@@ -176,6 +176,7 @@ def get_orders():
         'session_id': session.session_id,
         'session_status': session.status,
         'total_amount': session.total_amount,
+        'has_bill': session.bill is not None,
     })
 
 

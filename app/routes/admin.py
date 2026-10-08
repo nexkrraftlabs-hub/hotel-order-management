@@ -28,11 +28,11 @@ admin_bp = Blueprint('admin', __name__)
 
 
 def admin_required(f):
-    """Decorator to require admin role."""
+    """Decorator to require admin role (or staff)."""
     @wraps(f)
     @login_required
     def decorated(*args, **kwargs):
-        if not current_user.is_admin:
+        if not (current_user.is_admin or current_user.is_kitchen or current_user.is_waiter):
             flash('Access denied. Admin privileges required.', 'danger')
             return redirect(url_for('auth.login'))
         return f(*args, **kwargs)
@@ -108,16 +108,58 @@ def live_orders():
     return render_template('admin/live_orders.html', orders=orders_list)
 
 
+@admin_bp.route('/order/<int:order_id>/approve', methods=['POST'])
+@admin_required
+@csrf.exempt
+def approve_order(order_id):
+    """Admin approves order, immediately changing status to preparing."""
+    try:
+        OrderService.approve_order(order_id)
+        ActivityLog.log('Order approved & preparing', user_id=current_user.id, entity_type='order', entity_id=order_id)
+        db.session.commit()
+        return jsonify({'success': True, 'status': 'preparing'})
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+
+
 @admin_bp.route('/order/<int:order_id>/confirm', methods=['POST'])
 @admin_required
 @csrf.exempt
 def confirm_order(order_id):
-    """Confirm an order."""
+    """Confirm/approve an order (starts preparing)."""
     try:
-        OrderService.confirm_order(order_id)
-        ActivityLog.log('Order confirmed', user_id=current_user.id, entity_type='order', entity_id=order_id)
+        OrderService.approve_order(order_id)
+        ActivityLog.log('Order approved & preparing', user_id=current_user.id, entity_type='order', entity_id=order_id)
         db.session.commit()
-        return jsonify({'success': True})
+        return jsonify({'success': True, 'status': 'preparing'})
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+
+
+@admin_bp.route('/order/<int:order_id>/serve', methods=['POST'])
+@admin_required
+@csrf.exempt
+def serve_order(order_id):
+    """Admin marks order as served to table."""
+    try:
+        OrderService.mark_served(order_id)
+        ActivityLog.log('Order served', user_id=current_user.id, entity_type='order', entity_id=order_id)
+        db.session.commit()
+        return jsonify({'success': True, 'status': 'served'})
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+
+
+@admin_bp.route('/order/<int:order_id>/cancel', methods=['POST'])
+@admin_required
+@csrf.exempt
+def cancel_order(order_id):
+    """Admin cancels an order."""
+    try:
+        OrderService.cancel_order(order_id, reason='Cancelled by admin')
+        ActivityLog.log('Order cancelled', user_id=current_user.id, entity_type='order', entity_id=order_id)
+        db.session.commit()
+        return jsonify({'success': True, 'status': 'cancelled'})
     except ValueError as e:
         return jsonify({'error': str(e)}), 400
 
@@ -126,12 +168,12 @@ def confirm_order(order_id):
 @admin_required
 @csrf.exempt
 def send_to_kitchen(order_id):
-    """Send order to kitchen."""
+    """Send order to kitchen (legacy alias to approve)."""
     try:
-        OrderService.send_to_kitchen(order_id)
-        ActivityLog.log('Order sent to kitchen', user_id=current_user.id, entity_type='order', entity_id=order_id)
+        OrderService.approve_order(order_id)
+        ActivityLog.log('Order sent to kitchen & preparing', user_id=current_user.id, entity_type='order', entity_id=order_id)
         db.session.commit()
-        return jsonify({'success': True})
+        return jsonify({'success': True, 'status': 'preparing'})
     except ValueError as e:
         return jsonify({'error': str(e)}), 400
 

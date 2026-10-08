@@ -24,14 +24,16 @@
         </div>
       </div>
       <div style="text-align: right;">
-        {% if o.status in ['preparing', 'kitchen_accepted'] %}
-        <span class="badge badge-cooking">{{ o.status_display }}</span>
-        {% elif o.status == 'ready' %}
-        <span class="badge badge-ready">{{ o.status_display }}</span>
+        {% if o.status in ['preparing', 'confirmed', 'sent_to_kitchen', 'kitchen_accepted', 'ready'] %}
+        <span class="badge badge-cooking">Preparing</span>
         {% elif o.status == 'served' %}
-        <span class="badge badge-served">{{ o.status_display }}</span>
+        <span class="badge badge-served">Served</span>
+        {% elif o.status == 'paid' or o.payment_status == 'paid' %}
+        <span class="badge badge-paid">Paid</span>
+        {% elif o.status == 'cancelled' %}
+        <span class="badge badge-cancelled">Cancelled</span>
         {% else %}
-        <span class="badge badge-pending">{{ o.status_display }}</span>
+        <span class="badge badge-pending">Pending Approval</span>
         {% endif %}
         <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">
           {{ o.created_at.strftime('%I:%M %p') if o.created_at else '' }}
@@ -65,9 +67,24 @@
 
     <div style="margin-top: 12px; display: flex; gap: 8px;">
       {% if o.status == 'pending' %}
-      <button class="btn-sm btn-primary" style="flex: 1; justify-content: center;" data-id="{{ o.id }}" onclick="adminConfirmOrder(this.getAttribute('data-id'))">Confirm Order</button>
-      {% elif o.status == 'confirmed' %}
-      <button class="btn-sm btn-success" style="flex: 1; justify-content: center;" data-id="{{ o.id }}" onclick="adminSendKitchen(this.getAttribute('data-id'))">Send to Kitchen</button>
+      <button class="btn-sm btn-primary" style="flex: 1; justify-content: center;" data-id="{{ o.id }}" onclick="adminApproveOrder(this.getAttribute('data-id'))">
+        <i class="bi bi-check-circle"></i> Approve Order
+      </button>
+      <button class="btn-sm btn-outline" style="color: #EF4444; border-color: #FCA5A5; padding: 6px 10px;" data-id="{{ o.id }}" onclick="adminCancelOrder(this.getAttribute('data-id'))" title="Cancel order">
+        <i class="bi bi-x-lg"></i>
+      </button>
+      {% elif o.status in ['preparing', 'confirmed', 'sent_to_kitchen', 'kitchen_accepted', 'ready'] %}
+      <button class="btn-sm btn-success" style="flex: 1; justify-content: center;" data-id="{{ o.id }}" onclick="adminServeOrder(this.getAttribute('data-id'))">
+        <i class="bi bi-check2-circle"></i> Mark Served
+      </button>
+      {% elif o.status == 'served' and o.payment_status != 'paid' %}
+      <button class="btn-sm" style="flex: 1; justify-content: center; background: #F59E0B; color: #fff;" data-session-id="{{ o.session_id }}" onclick="adminApprovePayment(this.getAttribute('data-session-id'))">
+        <i class="bi bi-cash-coin"></i> Approve Payment
+      </button>
+      {% elif o.payment_status == 'paid' or o.status == 'paid' %}
+      <a href="{{ url_for('admin.bills') }}" class="btn-sm btn-outline" style="flex: 1; justify-content: center; color: #059669; text-decoration: none;">
+        <i class="bi bi-receipt"></i> Bill Ready
+      </a>
       {% endif %}
     </div>
   </div>
@@ -84,9 +101,84 @@
 {% block extra_scripts %}
 {{ super() }}
 <script>
-// Auto reload every 5 seconds
+async function adminApproveOrder(orderId) {
+  try {
+    const res = await fetch(`/admin/order/${orderId}/approve`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    const data = await res.json();
+    if (data.success) {
+      App.showToast('Order approved & food preparing', 'success');
+      setTimeout(() => location.reload(), 400);
+    } else {
+      App.showToast(data.error || 'Failed to approve', 'error');
+    }
+  } catch (e) {
+    App.showToast('Network error', 'error');
+  }
+}
+
+async function adminServeOrder(orderId) {
+  try {
+    const res = await fetch(`/admin/order/${orderId}/serve`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    const data = await res.json();
+    if (data.success) {
+      App.showToast('Order marked as served', 'success');
+      setTimeout(() => location.reload(), 400);
+    } else {
+      App.showToast(data.error || 'Failed to serve', 'error');
+    }
+  } catch (e) {
+    App.showToast('Network error', 'error');
+  }
+}
+
+async function adminApprovePayment(sessionId) {
+  if (!confirm('Approve payment for this dining session and generate final bill?')) return;
+  try {
+    const res = await fetch(`/admin/payment/approve/${sessionId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ payment_method: 'cash' })
+    });
+    const data = await res.json();
+    if (data.success) {
+      App.showToast('Payment approved & bill generated', 'success');
+      setTimeout(() => location.reload(), 400);
+    } else {
+      App.showToast(data.error || 'Failed to approve payment', 'error');
+    }
+  } catch (e) {
+    App.showToast('Network error', 'error');
+  }
+}
+
+async function adminCancelOrder(orderId) {
+  if (!confirm('Are you sure you want to cancel this order?')) return;
+  try {
+    const res = await fetch(`/admin/order/${orderId}/cancel`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    const data = await res.json();
+    if (data.success) {
+      App.showToast('Order cancelled', 'info');
+      setTimeout(() => location.reload(), 400);
+    } else {
+      App.showToast(data.error || 'Failed to cancel', 'error');
+    }
+  } catch (e) {
+    App.showToast('Network error', 'error');
+  }
+}
+
+// Auto reload every 10 seconds
 setInterval(() => {
-  // Can fetch JSON or soft reload
-}, 5000);
+  // Soft check can be added
+}, 10000);
 </script>
 {% endblock %}
