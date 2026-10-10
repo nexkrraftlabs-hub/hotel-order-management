@@ -37,5 +37,11 @@ class Payment(BaseModel):
     APPROVED = 'approved'
     PAID = 'paid'
     
+    @property
+    def transaction_id(self):
+        """Generate human-readable payment reference."""
+        date_str = self.created_at.strftime('%Y%m%d') if self.created_at else 'TODAY'
+        return f'PAY-{date_str}-{self.id:04d}'
+    
     def __repr__(self):
         return f'<Payment {self.id} ({self.status})>'

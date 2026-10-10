@@ -21,7 +21,7 @@ class SessionService:
             session = CustomerSession.query.filter_by(
                 browser_session_id=browser_session_id,
             ).filter(
-                CustomerSession.status.in_(['active', 'payment_pending'])
+                CustomerSession.status.in_(['active', 'payment_pending', 'counter_payment_requested'])
             ).first()
             
             if session:
@@ -48,14 +48,20 @@ class SessionService:
     
     @staticmethod
     def get_session_by_browser_id(browser_session_id):
-        """Get active session by browser session ID."""
+        """Get active session by browser session ID, or recent session."""
         if not browser_session_id:
             return None
-        return CustomerSession.query.filter_by(
+        session = CustomerSession.query.filter_by(
             browser_session_id=browser_session_id,
         ).filter(
-            CustomerSession.status.in_(['active', 'payment_pending'])
+            CustomerSession.status.in_(['active', 'payment_pending', 'counter_payment_requested'])
         ).first()
+        if session:
+            return session
+        # Fallback to most recent session so completed/paid orders can still be viewed
+        return CustomerSession.query.filter_by(
+            browser_session_id=browser_session_id,
+        ).order_by(CustomerSession.created_at.desc()).first()
     
     @staticmethod
     def get_active_session_for_token(token_id):
@@ -63,7 +69,7 @@ class SessionService:
         return CustomerSession.query.filter_by(
             token_id=token_id,
         ).filter(
-            CustomerSession.status.in_(['active', 'payment_pending'])
+            CustomerSession.status.in_(['active', 'payment_pending', 'counter_payment_requested'])
         ).first()
     
     @staticmethod

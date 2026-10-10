@@ -106,6 +106,113 @@ class NotificationService:
             'session_id': session.session_id,
             'token': session.token.token_number if session.token else None,
         }, to=f'session_{session.session_id}')
+        
+        # Also notify admin
+        socketio.emit('admin_notification', {
+            'type': 'payment_success',
+            'title': 'Payment Received!',
+            'message': f'Payment of ₹{session.total_amount:.0f} received for Token #{session.token.token_number if session.token else "N/A"}.',
+            'session_id': session.session_id,
+        }, to='admin')
+    
+    @staticmethod
+    def notify_item_ready(order_item):
+        """Notify customer that a specific item in their order is ready at the counter."""
+        order = order_item.order
+        session = order.session if order else None
+        token_num = session.token.token_number if session and session.token else 0
+        token_str = f"#{token_num:02d}" if token_num else "your order"
+        title = "🔔 Food Ready at Counter!"
+        message = f"Token {token_str}: '{order_item.item_name}' (x{order_item.quantity}) is ready at the counter! Please collect it."
+        
+        NotificationService.create_notification(
+            session,
+            Notification.ITEM_READY,
+            title,
+            message,
+            data=f'{{"order_id": "{order.order_id if order else ""}", "item_id": {order_item.id}}}'
+        )
+        
+        # Emit real-time item ready event to customer session
+        if session:
+            socketio.emit('item_ready', {
+                'order_id': order.order_id if order else '',
+                'item_id': order_item.id,
+                'item_name': order_item.item_name,
+                'quantity': order_item.quantity,
+                'token': token_num,
+                'message': message,
+            }, to=f'session_{session.session_id}')
+            
+        # Emit to staff rooms
+        socketio.emit('item_status_update', {
+            'order_id': order.order_id if order else '',
+            'item_id': order_item.id,
+            'item_name': order_item.item_name,
+            'status': 'ready',
+            'token': token_num,
+        }, to='admin')
+        socketio.emit('item_status_update', {
+            'order_id': order.order_id if order else '',
+            'item_id': order_item.id,
+            'item_name': order_item.item_name,
+            'status': 'ready',
+            'token': token_num,
+        }, to='kitchen')
+
+    @staticmethod
+    def notify_item_collected(order_item):
+        """Notify that customer collected an item from counter."""
+        order = order_item.order
+        session = order.session if order else None
+        token_num = session.token.token_number if session and session.token else 0
+        
+        if session:
+            socketio.emit('item_collected', {
+                'order_id': order.order_id if order else '',
+                'item_id': order_item.id,
+                'item_name': order_item.item_name,
+                'token': token_num,
+            }, to=f'session_{session.session_id}')
+            
+        socketio.emit('item_status_update', {
+            'order_id': order.order_id if order else '',
+            'item_id': order_item.id,
+            'item_name': order_item.item_name,
+            'status': 'collected',
+            'token': token_num,
+        }, to='admin')
+        socketio.emit('item_status_update', {
+            'order_id': order.order_id if order else '',
+            'item_id': order_item.id,
+            'item_name': order_item.item_name,
+            'status': 'collected',
+            'token': token_num,
+        }, to='kitchen')
+
+    @staticmethod
+    def notify_counter_payment_requested(session, payment_method='cash'):
+        """Notify staff that customer requested to pay at counter."""
+        token_num = session.token.token_number if session.token else 0
+        token_str = f"#{token_num:02d}" if token_num else "Customer"
+        title = "🏢 Counter Payment Requested"
+        method_label = "Cash" if payment_method in ['cash', 'counter_cash'] else "Counter UPI / Card"
+        message = f"Token {token_str} requested to pay ₹{session.total_amount:.0f} at counter via {method_label}."
+        
+        NotificationService.create_notification(
+            session,
+            Notification.COUNTER_PAYMENT_REQUESTED,
+            title,
+            message
+        )
+        
+        socketio.emit('counter_payment_requested', {
+            'session_id': session.session_id,
+            'token': token_num,
+            'total_amount': session.total_amount,
+            'payment_method': payment_method,
+            'message': message,
+        }, to='admin')
     
     @staticmethod
     def get_session_notifications(session_id):

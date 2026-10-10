@@ -4,11 +4,14 @@ from app.extensions import db, csrf
 from app.models.menu_item import MenuItem
 from app.models.category import Category
 from app.models.order import Order
+from app.models.order_item import OrderItem
+from app.models.restaurant import Restaurant
 from app.models.notification import Notification
 from app.models.customer_session import CustomerSession
 from app.services.session_service import SessionService
 from app.services.cart_service import CartService
 from app.services.order_service import OrderService
+from app.services.payment_service import PaymentService
 from app.services.notification_service import NotificationService
 from app.services.billing_service import BillingService
 
@@ -160,16 +163,45 @@ def place_order():
 
 @api_bp.route('/orders', methods=['GET'])
 def get_orders():
-    """Get orders for a session."""
+    """Get orders for a session with live item-by-item status and payment information."""
     browser_session_id = request.args.get('browser_session_id')
     if not browser_session_id:
-        return jsonify({'orders': []})
+        return jsonify({
+            'orders': [],
+            'token': None,
+            'is_paid': False,
+            'is_counter_requested': False,
+            'has_ready_items': False,
+            'ready_items': [],
+        })
     
     session = SessionService.get_session_by_browser_id(browser_session_id)
     if not session:
-        return jsonify({'orders': [], 'token': None})
+        return jsonify({
+            'orders': [],
+            'token': None,
+            'is_paid': False,
+            'is_counter_requested': False,
+            'has_ready_items': False,
+            'ready_items': [],
+        })
     
     orders = session.orders.all()
+    ready_items = []
+    for o in orders:
+        for item in o.items:
+            if getattr(item, 'status', None) == 'ready':
+                ready_items.append({
+                    'id': item.id,
+                    'order_id': o.order_id,
+                    'item_name': item.item_name,
+                    'quantity': item.quantity,
+                    'is_veg': item.is_veg,
+                })
+                
+    is_paid = getattr(session, 'is_paid', False)
+    is_counter_requested = getattr(session, 'is_counter_payment_requested', False)
+    
     return jsonify({
         'orders': [o.to_dict() for o in orders],
         'token': session.token.token_number if session.token else None,
@@ -177,6 +209,12 @@ def get_orders():
         'session_status': session.status,
         'total_amount': session.total_amount,
         'has_bill': session.bill is not None,
+        'ready_items': ready_items,
+        'has_ready_items': len(ready_items) > 0,
+        'is_paid': is_paid,
+        'payment_status': session.payment.status if session.payment else 'pending',
+        'payment_method': session.payment.payment_method if session.payment else None,
+        'is_counter_requested': is_counter_requested,
     })
 
 
@@ -317,3 +355,141 @@ def update_session_info():
     )
     
     return jsonify({'success': True})
+
+
+# ─── DUAL PAYMENT APIS (TABLE/MOBILE PAY & COUNTER PAY) ──────
+@api_bp.route('/payment/info', methods=['GET'])
+def get_payment_info():
+    """Get payment details for table/mobile payment (UPI QR string, total, restaurant info)."""
+    import urllib.parse
+    browser_session_id = request.args.get('browser_session_id')
+    if not browser_session_id:
+        return jsonify({'error': 'Session required'}), 400
+    
+    session = SessionService.get_session_by_browser_id(browser_session_id)
+    if not session:
+        return jsonify({'error': 'Session not found'}), 404
+        
+    restaurant = Restaurant.query.first()
+    rest_name = restaurant.name if restaurant else 'The Royal Feast'
+    upi_id = getattr(restaurant, 'upi_id', None) or 'royalfeast@upi'
+    
+    total = session.total_amount
+    token_num = session.token.token_number if session.token else 0
+    token_str = f"{token_num:02d}" if token_num else "00"
+    
+    encoded_name = urllib.parse.quote(rest_name)
+    upi_uri = f"upi://pay?pa={upi_id}&pn={encoded_name}&am={total:.2f}&cu=INR&tn=Token_{token_str}"
+    
+    return jsonify({
+        'session_id': session.session_id,
+        'token': token_num,
+        'total_amount': total,
+        'restaurant_name': rest_name,
+        'upi_id': upi_id,
+        'upi_uri': upi_uri,
+        'is_paid': getattr(session, 'is_paid', False),
+        'is_counter_requested': getattr(session, 'is_counter_payment_requested', False),
+        'payment_status': session.payment.status if session.payment else 'pending',
+        'has_bill': session.bill is not None,
+    })
+
+
+@api_bp.route('/payment/pay-online', methods=['POST'])
+@csrf.exempt
+def pay_online():
+    """Customer pays directly from mobile / table (UPI / QR / Instant online payment)."""
+    data = request.get_json() or {}
+    browser_session_id = data.get('browser_session_id')
+    payment_method = data.get('payment_method', 'online_upi')
+    transaction_id = data.get('transaction_id')
+    
+    if not browser_session_id:
+        return jsonify({'error': 'Session required'}), 400
+        
+    session = SessionService.get_session_by_browser_id(browser_session_id)
+    if not session:
+        return jsonify({'error': 'Session not found'}), 404
+        
+    try:
+        payment = PaymentService.pay_online(session.id, payment_method=payment_method, transaction_id=transaction_id)
+        return jsonify({
+            'success': True,
+            'message': 'Payment completed successfully!',
+            'session_id': session.session_id,
+            'bill_url': f'/bill/{session.session_id}',
+            'payment_status': 'paid',
+        })
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+
+
+@api_bp.route('/payment/request-counter', methods=['POST'])
+@csrf.exempt
+def request_counter_payment():
+    """Customer requests to pay at the counter (cash or card/counter scanner)."""
+    data = request.get_json() or {}
+    browser_session_id = data.get('browser_session_id')
+    payment_method = data.get('payment_method', 'counter_cash')
+    
+    if not browser_session_id:
+        return jsonify({'error': 'Session required'}), 400
+        
+    session = SessionService.get_session_by_browser_id(browser_session_id)
+    if not session:
+        return jsonify({'error': 'Session not found'}), 404
+        
+    try:
+        PaymentService.request_counter_payment(session.id, payment_method=payment_method)
+        return jsonify({
+            'success': True,
+            'message': 'Counter payment requested. Please visit the counter to complete payment.',
+            'session_status': 'counter_payment_requested',
+            'token': session.token.token_number if session.token else None,
+        })
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+
+
+# ─── ITEM-LEVEL STATUS APIS (PREPARATION & COUNTER PICKUP) ───
+@api_bp.route('/order/item/<int:item_id>/status', methods=['POST'])
+@csrf.exempt
+def update_item_status(item_id):
+    """Update individual order item status (pending, preparing, ready, collected)."""
+    data = request.get_json() or {}
+    new_status = data.get('status')
+    if not new_status:
+        return jsonify({'error': 'Status is required'}), 400
+        
+    try:
+        item = OrderService.update_item_status(item_id, new_status)
+        return jsonify({
+            'success': True,
+            'item': item.to_dict(),
+            'order_id': item.order.order_id,
+            'order_status': item.order.status,
+        })
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+
+
+@api_bp.route('/order/<int:order_id>/items/ready', methods=['POST'])
+@csrf.exempt
+def mark_all_order_items_ready(order_id):
+    """Mark all items of an order ready for counter pickup."""
+    try:
+        order = OrderService.mark_all_items_ready(order_id)
+        return jsonify({'success': True, 'order': order.to_dict()})
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+
+
+@api_bp.route('/order/<int:order_id>/items/collected', methods=['POST'])
+@csrf.exempt
+def mark_all_order_items_collected(order_id):
+    """Mark all items of an order as collected by customer from counter."""
+    try:
+        order = OrderService.mark_served(order_id)
+        return jsonify({'success': True, 'order': order.to_dict()})
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400

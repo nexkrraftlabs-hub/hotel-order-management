@@ -3,6 +3,11 @@
 {% block title %}Payments & Billing | Admin{% endblock %}
 
 {% block admin_content %}
+<style>
+.counter-req-row {
+  background: #FFFBEB !important;
+}
+</style>
 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
   <div>
     <h1 style="font-size: 1.4rem; font-weight: 800;">Payments & Cashier Desk</h1>
@@ -35,29 +40,50 @@
     <tbody>
       {% for item in pending %}
       {% set sess = item.session %}
-      <tr>
-        <td style="font-size: 1.2rem; font-weight: 900; color: var(--primary);">
+      <tr class="{% if item.is_counter_requested %}counter-req-row{% endif %}">
+        <td style="font-size: 1.25rem; font-weight: 900; color: var(--primary);">
           #{{ "%02d"|format(sess.token.token_number) if sess.token else '--' }}
         </td>
         <td style="font-weight: 600; font-size: 0.85rem;">{{ sess.session_id }}</td>
         <td>{{ sess.customer_name if sess.customer_name else 'Guest Customer' }}</td>
         <td>{{ item.orders|length }} orders</td>
-        <td style="font-size: 1.1rem; font-weight: 900; color: var(--text-main);">₹{{ "%.0f"|format(item.total) }}</td>
+        <td style="font-size: 1.15rem; font-weight: 900; color: var(--text-main);">₹{{ "%.0f"|format(item.total) }}</td>
         <td>
-          {% if item.has_served %}
-          <span class="badge" style="background: #DCFCE7; color: #166534;"><i class="bi bi-check2"></i> Food Served</span>
+          {% if item.is_counter_requested %}
+            <span class="badge" style="background: #FEF3C7; color: #B45309; font-weight: 800; display: inline-flex; align-items: center; gap: 4px;">
+              <i class="bi bi-shop"></i> Pay at Counter ({{ item.requested_method|upper }})
+            </span>
+          {% elif item.has_served %}
+            <span class="badge" style="background: #DCFCE7; color: #166534;"><i class="bi bi-check2"></i> Food Served</span>
           {% else %}
-          <span class="badge badge-cooking">Cooking / In Progress</span>
+            <span class="badge badge-cooking">Cooking / In Progress</span>
           {% endif %}
         </td>
         <td>
-          <button class="btn-sm btn-success" 
-                  data-session-id="{{ sess.id }}" 
-                  data-token="{{ "%02d"|format(sess.token.token_number) if sess.token else '--' }}" 
-                  data-total="{{ item.total }}"
-                  onclick="openPaymentModal(this.getAttribute('data-session-id'), this.getAttribute('data-token'), parseFloat(this.getAttribute('data-total')))">
-            <i class="bi bi-cash-coin"></i> Approve & Settle Bill
-          </button>
+          <div style="display: flex; gap: 6px;">
+            <button class="btn-sm btn-success" 
+                    title="Quick settle with Cash"
+                    data-session-id="{{ sess.id }}"
+                    data-method="counter_cash"
+                    onclick="handleQuickSettleClick(this)">
+              <i class="bi bi-cash"></i> Cash
+            </button>
+            <button class="btn-sm" 
+                    style="background: #2563EB; color: #fff; border: none;"
+                    title="Quick settle with UPI"
+                    data-session-id="{{ sess.id }}"
+                    data-method="counter_upi"
+                    onclick="handleQuickSettleClick(this)">
+              <i class="bi bi-qr-code"></i> UPI
+            </button>
+            <button class="btn-sm btn-outline" 
+                    data-session-id="{{ sess.id }}" 
+                    data-token="{{ "%02d"|format(sess.token.token_number) if sess.token else '--' }}" 
+                    data-total="{{ item.total }}"
+                    onclick="handleOpenPaymentModalClick(this)">
+              More <i class="bi bi-chevron-right"></i>
+            </button>
+          </div>
         </td>
       </tr>
       {% else %}
@@ -199,6 +225,41 @@ async function confirmPaymentApproval() {
   } catch (e) {
     App.showToast('Network error', 'error');
   }
+}
+
+async function quickSettlePayment(sessionId, method) {
+  const methodLabel = method === 'counter_cash' ? 'CASH' : 'UPI';
+  if (!confirm(`Confirm receipt of ${methodLabel} payment and settle this session?`)) return;
+
+  try {
+    const res = await fetch(`/admin/payment/approve/${sessionId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ payment_method: method })
+    });
+    const data = await res.json();
+    if (data.success) {
+      App.showToast(`Payment settled via ${methodLabel}! Bill generated.`, 'success');
+      setTimeout(() => location.reload(), 400);
+    } else {
+      App.showToast(data.error || 'Failed to approve payment', 'error');
+    }
+  } catch (e) {
+    App.showToast('Network error', 'error');
+  }
+}
+
+function handleQuickSettleClick(btn) {
+  const sessionId = btn.getAttribute('data-session-id');
+  const method = btn.getAttribute('data-method');
+  quickSettlePayment(sessionId, method);
+}
+
+function handleOpenPaymentModalClick(btn) {
+  const sessionId = btn.getAttribute('data-session-id');
+  const token = btn.getAttribute('data-token');
+  const total = parseFloat(btn.getAttribute('data-total')) || 0;
+  openPaymentModal(sessionId, token, total);
 }
 </script>
 {% endblock %}

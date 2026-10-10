@@ -59,6 +59,7 @@ class OrderService:
                 line_total=line_total,
                 is_veg=menu_item.is_veg,
                 special_instructions=cart_item.special_instructions,
+                status=OrderItem.PENDING,
             )
             order_items.append(order_item)
         
@@ -191,11 +192,18 @@ class OrderService:
         
         order = OrderService.update_order_status(order_id, Order.READY)
         
+        # Mark all items as ready if not already collected
+        now = datetime.now(timezone.utc)
+        for item in order.items:
+            if item.status != OrderItem.COLLECTED:
+                item.status = OrderItem.READY
+                item.ready_at = now
+        
         assignment = KitchenAssignment.query.filter_by(order_id=order.id).first()
         if assignment:
             assignment.status = 'ready'
-            assignment.completed_at = datetime.now(timezone.utc)
-            db.session.commit()
+            assignment.completed_at = now
+        db.session.commit()
         
         return order
     
@@ -235,17 +243,91 @@ class OrderService:
     
     @staticmethod
     def mark_served(order_id):
-        """Waiter marks order as served."""
+        """Waiter/Counter marks order as served/collected."""
         from app.models.waiter_assignment import WaiterAssignment
         
         order = OrderService.update_order_status(order_id, Order.SERVED)
         
+        # Mark all items as collected
+        now = datetime.now(timezone.utc)
+        for item in order.items:
+            item.status = OrderItem.COLLECTED
+            if not item.collected_at:
+                item.collected_at = now
+        
         assignment = WaiterAssignment.query.filter_by(order_id=order.id).first()
         if assignment:
             assignment.status = 'served'
-            assignment.served_at = datetime.now(timezone.utc)
-            db.session.commit()
+            assignment.served_at = now
+        db.session.commit()
         
+        return order
+
+    @staticmethod
+    def update_item_status(item_id, new_status, user_id=None):
+        """Update an individual order item's status (for item-by-item preparation and counter pickup)."""
+        item = db.session.get(OrderItem, item_id)
+        if not item:
+            raise ValueError('Order item not found')
+        
+        if new_status not in [OrderItem.PENDING, OrderItem.PREPARING, OrderItem.READY, OrderItem.COLLECTED]:
+            raise ValueError(f'Invalid item status: {new_status}')
+        
+        now = datetime.now(timezone.utc)
+        item.status = new_status
+        order = item.order
+        
+        if new_status == OrderItem.READY:
+            item.ready_at = now
+            # If order is still pending/confirmed/sent to kitchen, make sure it's preparing/ready
+            if order.status in [Order.PENDING, Order.CONFIRMED, Order.SENT_TO_KITCHEN, Order.KITCHEN_ACCEPTED]:
+                order.status = Order.PREPARING
+                order.preparing_at = now
+            # If all items are ready, order becomes ready
+            if all(i.status in [OrderItem.READY, OrderItem.COLLECTED] for i in order.items):
+                order.status = Order.READY
+                order.ready_at = now
+            db.session.commit()
+            NotificationService.notify_item_ready(item)
+            
+        elif new_status == OrderItem.COLLECTED:
+            item.collected_at = now
+            # Check if all items in order are now collected
+            if all(i.status == OrderItem.COLLECTED for i in order.items):
+                if order.status in [Order.PREPARING, Order.READY, Order.TRANSFERRED_TO_WAITER, Order.SERVING, Order.CONFIRMED]:
+                    order.status = Order.SERVED
+                    order.served_at = now
+                    NotificationService.notify_order_status_change(order.session, order, Order.SERVED)
+            db.session.commit()
+            NotificationService.notify_item_collected(item)
+            
+        elif new_status == OrderItem.PREPARING:
+            if order.status in [Order.PENDING, Order.CONFIRMED, Order.SENT_TO_KITCHEN, Order.KITCHEN_ACCEPTED]:
+                order.status = Order.PREPARING
+                order.preparing_at = now
+            db.session.commit()
+            
+        else:
+            db.session.commit()
+            
+        return item
+    
+    @staticmethod
+    def mark_all_items_ready(order_id):
+        """Mark all items of an order ready for counter pickup."""
+        order = db.session.get(Order, order_id)
+        if not order:
+            raise ValueError('Order not found')
+        now = datetime.now(timezone.utc)
+        for item in order.items:
+            if item.status != OrderItem.COLLECTED:
+                item.status = OrderItem.READY
+                item.ready_at = now
+                NotificationService.notify_item_ready(item)
+        if order.status in [Order.PENDING, Order.CONFIRMED, Order.SENT_TO_KITCHEN, Order.KITCHEN_ACCEPTED, Order.PREPARING]:
+            order.status = Order.READY
+            order.ready_at = now
+        db.session.commit()
         return order
     
     @staticmethod

@@ -22,7 +22,7 @@
         
         <ul class="kds-item-list">
           {% for item in o.items %}
-          <li class="kds-item">
+          <li class="kds-item" style="display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px dashed rgba(255,255,255,0.1);">
             <span>
               <span class="qty-badge">{{ item.quantity }}x</span>
               <span class="diet-icon {{ 'veg' if item.is_veg else 'nonveg' }}" style="display: inline-block; vertical-align: middle;"></span>
@@ -38,7 +38,7 @@
         </div>
         {% endif %}
 
-        <button class="btn-primary-block" style="background: #3B82F6; padding: 10px; font-size: 0.85rem;" data-id="{{ o.id }}" onclick="kitchenAction('accept', this.getAttribute('data-id'))">
+        <button class="btn-primary-block" style="background: #3B82F6; padding: 10px; font-size: 0.85rem;" data-order-id="{{ o.id }}" data-action="accept" onclick="handleKitchenBtnAction(this)">
           <i class="bi bi-check2"></i> Accept Order
         </button>
       </div>
@@ -63,7 +63,7 @@
 
         <ul class="kds-item-list">
           {% for item in o.items %}
-          <li class="kds-item">
+          <li class="kds-item" style="display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px dashed rgba(255,255,255,0.1);">
             <span>
               <span class="qty-badge">{{ item.quantity }}x</span>
               <span class="diet-icon {{ 'veg' if item.is_veg else 'nonveg' }}" style="display: inline-block; vertical-align: middle;"></span>
@@ -79,7 +79,7 @@
         </div>
         {% endif %}
 
-        <button class="btn-primary-block" style="background: #F59E0B; color: #000; padding: 10px; font-size: 0.85rem;" data-id="{{ o.id }}" onclick="kitchenAction('prepare', this.getAttribute('data-id'))">
+        <button class="btn-primary-block" style="background: #F59E0B; color: #000; padding: 10px; font-size: 0.85rem;" data-order-id="{{ o.id }}" data-action="prepare" onclick="handleKitchenBtnAction(this)">
           <i class="bi bi-fire"></i> Start Cooking
         </button>
       </div>
@@ -87,7 +87,7 @@
     </div>
   </div>
 
-  <!-- 3. PREPARING -->
+  <!-- 3. PREPARING (ITEM BY ITEM DISPATCH & COUNTER PICKUP) -->
   <div class="kds-column">
     <div class="kds-col-header cooking">
       <span><i class="bi bi-fire"></i> Preparing</span>
@@ -102,14 +102,29 @@
         </div>
         <div style="font-size: 0.75rem; color: #94A3B8; margin-bottom: 8px;">Order: {{ o.order_id }}</div>
 
-        <ul class="kds-item-list">
+        <!-- Item-by-item dispatch actions -->
+        <ul class="kds-item-list" style="margin-bottom: 12px;">
           {% for item in o.items %}
-          <li class="kds-item">
-            <span>
+          <li class="kds-item" style="display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px dashed rgba(255,255,255,0.1);">
+            <div style="flex: 1; padding-right: 8px;">
               <span class="qty-badge">{{ item.quantity }}x</span>
               <span class="diet-icon {{ 'veg' if item.is_veg else 'nonveg' }}" style="display: inline-block; vertical-align: middle;"></span>
-              {{ item.item_name }}
-            </span>
+              <span style="font-weight: 600;">{{ item.item_name }}</span>
+            </div>
+            <div>
+              {% if item.status == 'ready' %}
+                <span class="badge" style="background: #10B981; color: #fff; font-size: 0.7rem; padding: 4px 6px;">Ready 🔔</span>
+                <button data-item-id="{{ item.id }}" onclick="handleKitchenItemCollected(this)" style="background: #475569; color: #fff; border: none; border-radius: 4px; padding: 4px 8px; font-size: 0.7rem; cursor: pointer; margin-left: 4px;" title="Handed to customer">
+                  Handed ✅
+                </button>
+              {% elif item.status == 'collected' %}
+                <span class="badge" style="background: #334155; color: #94A3B8; font-size: 0.7rem; padding: 4px 6px;">Collected ✅</span>
+              {% else %}
+                <button data-item-id="{{ item.id }}" onclick="handleKitchenItemReady(this)" style="background: #10B981; color: #fff; border: none; border-radius: 6px; padding: 5px 10px; font-size: 0.75rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 4px;">
+                  <i class="bi bi-bell-fill"></i> Ready at Counter
+                </button>
+              {% endif %}
+            </div>
           </li>
           {% endfor %}
         </ul>
@@ -120,18 +135,23 @@
         </div>
         {% endif %}
 
-        <button class="btn-primary-block" style="background: #10B981; padding: 10px; font-size: 0.85rem;" data-id="{{ o.id }}" onclick="kitchenAction('ready', this.getAttribute('data-id'))">
-          <i class="bi bi-check-circle-fill"></i> Mark Ready
-        </button>
+        <div style="display: flex; gap: 6px; margin-top: 8px;">
+          <button class="btn-primary-block" style="background: #10B981; padding: 8px; font-size: 0.8rem; flex: 1;" data-order-id="{{ o.id }}" onclick="handleKitchenOrderAllReady(this)">
+            <i class="bi bi-bell-fill"></i> All Ready
+          </button>
+          <button class="btn-primary-block" style="background: #6366F1; padding: 8px; font-size: 0.8rem; flex: 1;" data-order-id="{{ o.id }}" onclick="handleKitchenOrderAllCollected(this)">
+            <i class="bi bi-check2-all"></i> All Handed
+          </button>
+        </div>
       </div>
       {% endfor %}
     </div>
   </div>
 
-  <!-- 4. READY FOR PICKUP -->
+  <!-- 4. READY AT COUNTER -->
   <div class="kds-column">
     <div class="kds-col-header ready">
-      <span><i class="bi bi-check-all"></i> Ready for Waiter</span>
+      <span><i class="bi bi-check-all"></i> Ready at Counter</span>
       <span class="badge" style="background: #10B981; color: #fff;" id="count-ready">{{ ready|length }}</span>
     </div>
     <div class="kds-col-body" id="col-ready">
@@ -139,24 +159,33 @@
       <div class="kds-card" id="kds-order-{{ o.id }}">
         <div class="kds-card-top">
           <div class="kds-token-num">#{{ "%02d"|format(o.session.token.token_number) if o.session and o.session.token else '--' }}</div>
-          <div class="kds-timer" style="color: #10B981;"><i class="bi bi-bell-fill"></i> READY</div>
+          <div class="kds-timer" style="color: #10B981;"><i class="bi bi-bell-fill"></i> AT COUNTER</div>
         </div>
         <div style="font-size: 0.75rem; color: #94A3B8; margin-bottom: 8px;">Order: {{ o.order_id }}</div>
 
         <ul class="kds-item-list">
           {% for item in o.items %}
-          <li class="kds-item">
+          <li class="kds-item" style="display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px dashed rgba(255,255,255,0.1);">
             <span>
               <span class="qty-badge">{{ item.quantity }}x</span>
               <span class="diet-icon {{ 'veg' if item.is_veg else 'nonveg' }}" style="display: inline-block; vertical-align: middle;"></span>
               {{ item.item_name }}
             </span>
+            <div>
+              {% if item.status == 'collected' %}
+                <span class="badge" style="background: #334155; color: #94A3B8; font-size: 0.7rem;">Collected ✅</span>
+              {% else %}
+                <button data-item-id="{{ item.id }}" onclick="handleKitchenItemCollected(this)" style="background: #475569; color: #fff; border: none; border-radius: 4px; padding: 4px 8px; font-size: 0.72rem; cursor: pointer;">
+                  Hand Over ✅
+                </button>
+              {% endif %}
+            </div>
           </li>
           {% endfor %}
         </ul>
 
-        <button class="btn-primary-block" style="background: #6366F1; padding: 10px; font-size: 0.85rem;" data-id="{{ o.id }}" onclick="kitchenAction('transfer', this.getAttribute('data-id'))">
-          <i class="bi bi-send-check"></i> Transfer to Waiter
+        <button class="btn-primary-block" style="background: #6366F1; padding: 10px; font-size: 0.85rem;" data-order-id="{{ o.id }}" onclick="handleKitchenOrderAllCollected(this)">
+          <i class="bi bi-check2-all"></i> All Handed to Customer
         </button>
       </div>
       {% endfor %}
@@ -169,6 +198,32 @@
 {% block extra_scripts %}
 {{ super() }}
 <script>
+function handleKitchenBtnAction(btn) {
+  const orderId = btn.getAttribute('data-order-id');
+  const action = btn.getAttribute('data-action');
+  kitchenAction(action, orderId);
+}
+
+function handleKitchenItemReady(btn) {
+  const itemId = btn.getAttribute('data-item-id');
+  markItemReady(itemId);
+}
+
+function handleKitchenItemCollected(btn) {
+  const itemId = btn.getAttribute('data-item-id');
+  markItemCollected(itemId);
+}
+
+function handleKitchenOrderAllReady(btn) {
+  const orderId = btn.getAttribute('data-order-id');
+  markOrderAllReady(orderId);
+}
+
+function handleKitchenOrderAllCollected(btn) {
+  const orderId = btn.getAttribute('data-order-id');
+  markOrderAllCollected(orderId);
+}
+
 async function kitchenAction(action, orderId) {
   try {
     const res = await fetch(`/kitchen/${action}/${orderId}`, {
@@ -187,6 +242,78 @@ async function kitchenAction(action, orderId) {
   }
 }
 
+async function markItemReady(itemId) {
+  try {
+    const res = await fetch(`/kitchen/item/${itemId}/ready`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    const data = await res.json();
+    if (data.success) {
+      App.showToast(`Item marked Ready at Counter! Customer notified 🔔`, 'success');
+      reloadKDS();
+    } else {
+      App.showToast(data.error || 'Failed to update item', 'error');
+    }
+  } catch (err) {
+    App.showToast('Network error', 'error');
+  }
+}
+
+async function markItemCollected(itemId) {
+  try {
+    const res = await fetch(`/kitchen/item/${itemId}/collected`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    const data = await res.json();
+    if (data.success) {
+      App.showToast(`Item handed over to customer ✅`, 'success');
+      reloadKDS();
+    } else {
+      App.showToast(data.error || 'Failed to update item', 'error');
+    }
+  } catch (err) {
+    App.showToast('Network error', 'error');
+  }
+}
+
+async function markOrderAllReady(orderId) {
+  try {
+    const res = await fetch(`/kitchen/order/${orderId}/ready-all`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    const data = await res.json();
+    if (data.success) {
+      App.showToast(`All items marked Ready at Counter 🔔`, 'success');
+      reloadKDS();
+    } else {
+      App.showToast(data.error || 'Failed to update order', 'error');
+    }
+  } catch (err) {
+    App.showToast('Network error', 'error');
+  }
+}
+
+async function markOrderAllCollected(orderId) {
+  try {
+    const res = await fetch(`/api/order/${orderId}/items/collected`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    const data = await res.json();
+    if (data.success) {
+      App.showToast(`Order items all handed over to customer ✅`, 'success');
+      reloadKDS();
+    } else {
+      App.showToast(data.error || 'Failed to update order', 'error');
+    }
+  } catch (err) {
+    App.showToast('Network error', 'error');
+  }
+}
+
 async function reloadKDS() {
   try {
     const res = await fetch('/kitchen/api/orders');
@@ -194,8 +321,8 @@ async function reloadKDS() {
 
     renderColumn('col-new', 'count-new', data.new_orders, 'accept', 'Accept Order', '#3B82F6', 'bi-check2');
     renderColumn('col-accepted', 'count-accepted', data.accepted, 'prepare', 'Start Cooking', '#F59E0B', 'bi-fire', '#000');
-    renderColumn('col-preparing', 'count-preparing', data.preparing, 'ready', 'Mark Ready', '#10B981', 'bi-check-circle-fill');
-    renderColumn('col-ready', 'count-ready', data.ready, 'transfer', 'Transfer to Waiter', '#6366F1', 'bi-send-check');
+    renderPreparingColumn('col-preparing', 'count-preparing', data.preparing);
+    renderReadyColumn('col-ready', 'count-ready', data.ready);
   } catch (err) {
     console.error('KDS reload error:', err);
   }
@@ -251,8 +378,147 @@ function renderColumn(colId, countId, orders, action, actionLabel, btnBg, btnIco
           </div>
         ` : ''}
 
-        <button class="btn-primary-block" style="background: ${btnBg}; color: ${btnColor}; padding: 10px; font-size: 0.85rem;" onclick="kitchenAction('${action}', ${o.id})">
+        <button class="btn-primary-block" style="background: ${btnBg}; color: ${btnColor}; padding: 10px; font-size: 0.85rem;" data-order-id="${o.id}" data-action="${action}" onclick="handleKitchenBtnAction(this)">
           <i class="bi ${btnIcon}"></i> ${actionLabel}
+        </button>
+      </div>
+    `;
+  });
+
+  col.innerHTML = html;
+}
+
+function renderPreparingColumn(colId, countId, orders) {
+  const col = document.getElementById(colId);
+  const countEl = document.getElementById(countId);
+  if (countEl) countEl.textContent = orders.length;
+  if (!col) return;
+
+  if (orders.length === 0) {
+    col.innerHTML = `
+      <div style="text-align: center; padding: 40px 10px; color: #64748B;">
+        <i class="bi bi-inbox" style="font-size: 2rem; display: block; margin-bottom: 8px;"></i>
+        <span>No orders cooking</span>
+      </div>
+    `;
+    return;
+  }
+
+  let html = '';
+  orders.forEach(o => {
+    let itemsHtml = '';
+    o.items.forEach(it => {
+      let actionBtn = '';
+      if (it.status === 'ready') {
+        actionBtn = `
+          <span class="badge" style="background: #10B981; color: #fff; font-size: 0.7rem; padding: 4px 6px;">Ready 🔔</span>
+          <button data-item-id="${it.id}" onclick="handleKitchenItemCollected(this)" style="background: #475569; color: #fff; border: none; border-radius: 4px; padding: 4px 8px; font-size: 0.7rem; cursor: pointer; margin-left: 4px;">Handed ✅</button>
+        `;
+      } else if (it.status === 'collected') {
+        actionBtn = `<span class="badge" style="background: #334155; color: #94A3B8; font-size: 0.7rem; padding: 4px 6px;">Collected ✅</span>`;
+      } else {
+        actionBtn = `
+          <button data-item-id="${it.id}" onclick="handleKitchenItemReady(this)" style="background: #10B981; color: #fff; border: none; border-radius: 6px; padding: 5px 10px; font-size: 0.75rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 4px;">
+            <i class="bi bi-bell-fill"></i> Ready
+          </button>
+        `;
+      }
+
+      itemsHtml += `
+        <li class="kds-item" style="display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px dashed rgba(255,255,255,0.1);">
+          <div style="flex: 1; padding-right: 8px;">
+            <span class="qty-badge">${it.qty}x</span>
+            <span class="diet-icon ${it.is_veg ? 'veg' : 'nonveg'}" style="display: inline-block; vertical-align: middle;"></span>
+            <span style="font-weight: 600;">${it.name}</span>
+          </div>
+          <div>${actionBtn}</div>
+        </li>
+      `;
+    });
+
+    html += `
+      <div class="kds-card" id="kds-order-${o.id}">
+        <div class="kds-card-top">
+          <div class="kds-token-num">#${o.token ? String(o.token).padStart(2, '0') : '--'}</div>
+          <div class="kds-timer"><i class="bi bi-stopwatch"></i> Cooking</div>
+        </div>
+        <div style="font-size: 0.75rem; color: #94A3B8; margin-bottom: 8px;">Order: ${o.order_id}</div>
+
+        <ul class="kds-item-list" style="margin-bottom: 12px;">
+          ${itemsHtml}
+        </ul>
+
+        ${o.special_instructions ? `
+          <div class="kds-instructions">
+            <i class="bi bi-info-circle-fill"></i> Note: ${o.special_instructions}
+          </div>
+        ` : ''}
+
+        <div style="display: flex; gap: 6px; margin-top: 8px;">
+          <button class="btn-primary-block" style="background: #10B981; padding: 8px; font-size: 0.8rem; flex: 1;" data-order-id="${o.id}" onclick="handleKitchenOrderAllReady(this)">
+            <i class="bi bi-bell-fill"></i> All Ready
+          </button>
+          <button class="btn-primary-block" style="background: #6366F1; padding: 8px; font-size: 0.8rem; flex: 1;" data-order-id="${o.id}" onclick="handleKitchenOrderAllCollected(this)">
+            <i class="bi bi-check2-all"></i> All Handed
+          </button>
+        </div>
+      </div>
+    `;
+  });
+
+  col.innerHTML = html;
+}
+
+function renderReadyColumn(colId, countId, orders) {
+  const col = document.getElementById(colId);
+  const countEl = document.getElementById(countId);
+  if (countEl) countEl.textContent = orders.length;
+  if (!col) return;
+
+  if (orders.length === 0) {
+    col.innerHTML = `
+      <div style="text-align: center; padding: 40px 10px; color: #64748B;">
+        <i class="bi bi-inbox" style="font-size: 2rem; display: block; margin-bottom: 8px;"></i>
+        <span>No orders ready</span>
+      </div>
+    `;
+    return;
+  }
+
+  let html = '';
+  orders.forEach(o => {
+    let itemsHtml = '';
+    o.items.forEach(it => {
+      let btn = it.status === 'collected' ?
+        `<span class="badge" style="background: #334155; color: #94A3B8; font-size: 0.7rem;">Collected ✅</span>` :
+        `<button data-item-id="${it.id}" onclick="handleKitchenItemCollected(this)" style="background: #475569; color: #fff; border: none; border-radius: 4px; padding: 4px 8px; font-size: 0.72rem; cursor: pointer;">Hand Over ✅</button>`;
+
+      itemsHtml += `
+        <li class="kds-item" style="display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px dashed rgba(255,255,255,0.1);">
+          <span>
+            <span class="qty-badge">${it.qty}x</span>
+            <span class="diet-icon ${it.is_veg ? 'veg' : 'nonveg'}" style="display: inline-block; vertical-align: middle;"></span>
+            ${it.name}
+          </span>
+          <div>${btn}</div>
+        </li>
+      `;
+    });
+
+    html += `
+      <div class="kds-card" id="kds-order-${o.id}">
+        <div class="kds-card-top">
+          <div class="kds-token-num">#${o.token ? String(o.token).padStart(2, '0') : '--'}</div>
+          <div class="kds-timer" style="color: #10B981;"><i class="bi bi-bell-fill"></i> AT COUNTER</div>
+        </div>
+        <div style="font-size: 0.75rem; color: #94A3B8; margin-bottom: 8px;">Order: ${o.order_id}</div>
+
+        <ul class="kds-item-list">
+          ${itemsHtml}
+        </ul>
+
+        <button class="btn-primary-block" style="background: #6366F1; padding: 10px; font-size: 0.85rem;" data-order-id="${o.id}" onclick="handleKitchenOrderAllCollected(this)">
+          <i class="bi bi-check2-all"></i> All Handed to Customer
         </button>
       </div>
     `;

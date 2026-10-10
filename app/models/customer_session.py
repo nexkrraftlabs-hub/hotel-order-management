@@ -40,6 +40,7 @@ class CustomerSession(BaseModel):
     # Status constants
     ACTIVE = 'active'
     PAYMENT_PENDING = 'payment_pending'
+    COUNTER_PAYMENT_REQUESTED = 'counter_payment_requested'
     PAID = 'paid'
     COMPLETED = 'completed'
     CANCELLED = 'cancelled'
@@ -56,6 +57,30 @@ class CustomerSession(BaseModel):
     def order_count(self):
         """Get number of orders in this session."""
         return self.orders.count()
+    
+    @property
+    def ready_items_list(self):
+        """List of all items ready for counter pickup across all orders."""
+        ready_list = []
+        for order in self.orders.all():
+            for item in order.items:
+                if getattr(item, 'status', None) == 'ready':
+                    ready_list.append(item)
+        return ready_list
+    
+    @property
+    def is_counter_payment_requested(self):
+        """Check if customer requested to pay at counter."""
+        if self.status == self.COUNTER_PAYMENT_REQUESTED:
+            return True
+        if self.payment and self.payment.status == 'pending' and str(self.payment.payment_method).startswith('counter_'):
+            return True
+        return False
+        
+    @property
+    def is_paid(self):
+        """Check if session is fully paid."""
+        return self.status in [self.PAID, self.COMPLETED] or (self.payment and self.payment.status == 'paid')
     
     def __repr__(self):
         return f'<CustomerSession {self.session_id}>'

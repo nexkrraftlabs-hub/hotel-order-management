@@ -1,46 +1,224 @@
 {% extends "customer/base_customer.html" %}
 
-{% block title %}Live Order Tracking | {{ restaurant.name if restaurant else 'The Royal Feast' }}{% endblock %}
+{% block title %}Live Order & Counter Pickup | {{ restaurant.name if restaurant else 'The Royal Feast' }}{% endblock %}
 
 {% block customer_content %}
 <div style="padding: 16px 16px 100px;">
 
+  <!-- Header -->
   <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-    <h2 style="font-size: 1.25rem; font-weight: 800; color: var(--text-main);">Live Order Status</h2>
+    <div>
+      <h2 style="font-size: 1.25rem; font-weight: 800; color: var(--text-main); margin: 0;">Live Order Status</h2>
+      <p style="font-size: 0.78rem; color: var(--text-muted); margin: 2px 0 0;">Items are prepared & dispatched individually to the counter</p>
+    </div>
     <button class="btn-sm btn-outline" onclick="loadCustomerOrders()" title="Refresh Status">
       <i class="bi bi-arrow-clockwise"></i> Refresh
     </button>
   </div>
 
+  <!-- Dynamic Container -->
   <div id="orders-container">
-    <!-- Rendered dynamically -->
     <div style="text-align: center; padding: 40px 20px;">
-      <div class="status-dot" style="width: 12px; height: 12px; margin: 0 auto 12px;"></div>
-      <p style="font-size: 0.88rem; color: var(--text-muted);">Fetching your orders...</p>
+      <div class="status-dot" style="width: 14px; height: 14px; margin: 0 auto 12px; background: var(--primary);"></div>
+      <p style="font-size: 0.88rem; color: var(--text-muted);">Fetching your orders & token status...</p>
     </div>
   </div>
 
 </div>
+
+<!-- ═══════════ MODAL: PAY ONLINE (FROM TABLE/PHONE) ═══════════ -->
+<div id="pay-online-modal" style="display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.75); z-index: 9999; backdrop-filter: blur(4px); align-items: center; justify-content: center; padding: 16px;">
+  <div style="background: #FFFFFF; border-radius: 20px; max-width: 420px; width: 100%; padding: 24px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25); position: relative; animation: modalSlideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);">
+    
+    <button onclick="closePayOnlineModal()" style="position: absolute; right: 16px; top: 16px; border: none; background: #F1F5F9; width: 32px; height: 32px; border-radius: 50%; font-size: 1.1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; color: #64748B;">
+      <i class="bi bi-x"></i>
+    </button>
+
+    <div style="text-align: center; margin-bottom: 16px;">
+      <div style="display: inline-flex; align-items: center; justify-content: center; width: 48px; height: 48px; border-radius: 50%; background: #DCFCE7; color: #16A34A; font-size: 1.4rem; margin-bottom: 8px;">
+        <i class="bi bi-qr-code-scan"></i>
+      </div>
+      <h3 style="font-size: 1.15rem; font-weight: 800; color: #0F172A; margin: 0;">Pay Online From Table</h3>
+      <p style="font-size: 0.8rem; color: #64748B; margin: 4px 0 0;">Scan UPI QR or tap to open your preferred payment app</p>
+    </div>
+
+    <!-- Bill Total Highlight -->
+    <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 14px; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+      <div>
+        <div style="font-size: 0.72rem; color: #64748B; font-weight: 700; text-transform: uppercase;">Total Bill Amount</div>
+        <div id="modal-token-label" style="font-size: 0.78rem; color: #0F172A; font-weight: 600;">Token #--</div>
+      </div>
+      <div id="modal-bill-total" style="font-size: 1.4rem; font-weight: 900; color: #0F172A;">
+        ₹0
+      </div>
+    </div>
+
+    <!-- Dynamic UPI QR Code -->
+    <div style="text-align: center; margin-bottom: 16px; background: #FFFFFF; border: 1px dashed #CBD5E1; border-radius: 16px; padding: 14px;">
+      <img id="modal-qr-image" src="" alt="UPI QR Code" style="width: 180px; height: 180px; margin: 0 auto; display: block; border-radius: 8px;">
+      <div style="font-size: 0.72rem; color: #64748B; margin-top: 8px;">
+        Scan with <strong>GPay, PhonePe, Paytm</strong> or any UPI App
+      </div>
+    </div>
+
+    <!-- Direct UPI App Intent Link (Mobile users) -->
+    <a id="modal-upi-intent-btn" href="#" class="btn-primary-block" style="text-decoration: none; background: #2563EB; margin-bottom: 10px; display: flex; align-items: center; justify-content: center; gap: 8px;">
+      <i class="bi bi-phone"></i>
+      <span>Open in UPI App (GPay / PhonePe)</span>
+    </a>
+
+    <!-- Complete Payment Simulation / Instant Confirm -->
+    <button onclick="confirmOnlinePayment()" id="btn-confirm-online-pay" class="btn-primary-block" style="background: #16A34A; display: flex; align-items: center; justify-content: center; gap: 8px;">
+      <i class="bi bi-check2-circle"></i>
+      <span>I Have Completed Payment</span>
+    </button>
+    <div style="font-size: 0.7rem; color: #94A3B8; text-align: center; margin-top: 8px;">
+      Bill will generate immediately & token will be released.
+    </div>
+
+  </div>
+</div>
+
+<!-- ═══════════ MODAL: PAY AT COUNTER ═══════════ -->
+<div id="pay-counter-modal" style="display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.75); z-index: 9999; backdrop-filter: blur(4px); align-items: center; justify-content: center; padding: 16px;">
+  <div style="background: #FFFFFF; border-radius: 20px; max-width: 400px; width: 100%; padding: 24px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25); position: relative; animation: modalSlideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);">
+    
+    <button onclick="closePayCounterModal()" style="position: absolute; right: 16px; top: 16px; border: none; background: #F1F5F9; width: 32px; height: 32px; border-radius: 50%; font-size: 1.1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; color: #64748B;">
+      <i class="bi bi-x"></i>
+    </button>
+
+    <div style="text-align: center; margin-bottom: 18px;">
+      <div style="display: inline-flex; align-items: center; justify-content: center; width: 48px; height: 48px; border-radius: 50%; background: #FEF3C7; color: #D97706; font-size: 1.4rem; margin-bottom: 8px;">
+        <i class="bi bi-shop"></i>
+      </div>
+      <h3 style="font-size: 1.15rem; font-weight: 800; color: #0F172A; margin: 0;">Pay at Restaurant Counter</h3>
+      <p style="font-size: 0.8rem; color: #64748B; margin: 4px 0 0;">Pay with Cash, Card, or Counter Scanner</p>
+    </div>
+
+    <div style="background: #EFF6FF; border: 1px solid #BFDBFE; border-radius: 12px; padding: 12px 14px; margin-bottom: 18px; font-size: 0.8rem; color: #1E40AF; line-height: 1.4;">
+      <i class="bi bi-info-circle-fill" style="margin-right: 4px;"></i>
+      Show your <strong>Token Number</strong> at the billing counter. Staff will collect payment and provide your printed or digital bill!
+    </div>
+
+    <div style="margin-bottom: 18px;">
+      <label style="display: block; font-size: 0.78rem; font-weight: 700; color: #475569; margin-bottom: 6px;">
+        Choose Counter Payment Mode:
+      </label>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+        <label style="border: 2px solid #E2E8F0; border-radius: 10px; padding: 12px; text-align: center; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 4px;" id="lbl-counter-cash">
+          <input type="radio" name="counter_pay_method" value="counter_cash" checked style="margin-bottom: 4px;">
+          <span style="font-weight: 700; font-size: 0.85rem;"><i class="bi bi-cash-stack"></i> Cash</span>
+        </label>
+        <label style="border: 2px solid #E2E8F0; border-radius: 10px; padding: 12px; text-align: center; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 4px;" id="lbl-counter-upi">
+          <input type="radio" name="counter_pay_method" value="counter_upi" style="margin-bottom: 4px;">
+          <span style="font-weight: 700; font-size: 0.85rem;"><i class="bi bi-credit-card"></i> UPI / Card</span>
+        </label>
+      </div>
+    </div>
+
+    <button onclick="submitCounterPaymentRequest()" id="btn-submit-counter-req" class="btn-primary-block" style="background: #F59E0B; color: #000; font-weight: 800;">
+      <span>Notify Counter & Pay</span>
+      <i class="bi bi-arrow-right"></i>
+    </button>
+  </div>
+</div>
+
+<style>
+@keyframes pulseGlow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); }
+  50% { box-shadow: 0 0 0 10px rgba(16, 185, 129, 0); }
+}
+@keyframes modalSlideUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.counter-ready-alert {
+  background: linear-gradient(135deg, #10B981, #059669);
+  color: #FFFFFF;
+  border-radius: 16px;
+  padding: 16px;
+  margin-bottom: 20px;
+  box-shadow: 0 10px 25px -5px rgba(16, 185, 129, 0.4);
+  animation: pulseGlow 2s infinite;
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+.item-status-pill {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 4px 8px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.item-status-pill.ready {
+  background: #DCFCE7;
+  color: #16A34A;
+  border: 1px solid #86EFAC;
+}
+.item-status-pill.preparing {
+  background: #FEF3C7;
+  color: #D97706;
+  border: 1px solid #FDE68A;
+}
+.item-status-pill.collected {
+  background: #F1F5F9;
+  color: #64748B;
+  border: 1px solid #E2E8F0;
+}
+.item-status-pill.pending {
+  background: #F8FAFC;
+  color: #94A3B8;
+  border: 1px solid #E2E8F0;
+}
+</style>
 {% endblock %}
 
 {% block extra_scripts %}
 {{ super() }}
 <script>
-const STATUS_STAGES = [
-  { key: 'pending', label: 'Order Placed', desc: 'Order received by restaurant', icon: 'bi-check-circle' },
-  { key: 'preparing', label: 'Food Preparing', desc: 'Admin approved & kitchen is preparing', icon: 'bi-fire' },
-  { key: 'served', label: 'Served to You', desc: 'Bon Appétit! Enjoy your meal', icon: 'bi-check2-all' },
-  { key: 'paid', label: 'Payment Completed', desc: 'Payment approved & final bill generated', icon: 'bi-cash-coin' }
-];
+let lastKnownReadyItemIds = new Set();
+let cachedPaymentInfo = null;
 
-function getCustomerStageKey(status) {
-  if (['confirmed', 'sent_to_kitchen', 'kitchen_accepted', 'preparing', 'ready', 'transferred_to_waiter', 'serving'].includes(status)) {
-    return 'preparing';
+// Audio Chime synthesizer for counter pickup alerts
+function playPickupChime() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const now = ctx.currentTime;
+    
+    // First high note
+    const osc1 = ctx.createOscillator();
+    const gain1 = ctx.createGain();
+    osc1.type = 'sine';
+    osc1.frequency.setValueAtTime(659.25, now); // E5
+    gain1.gain.setValueAtTime(0.3, now);
+    gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+    osc1.connect(gain1);
+    gain1.connect(ctx.destination);
+    osc1.start(now);
+    osc1.stop(now + 0.4);
+
+    // Second celebratory note
+    const osc2 = ctx.createOscillator();
+    const gain2 = ctx.createGain();
+    osc2.type = 'sine';
+    osc2.frequency.setValueAtTime(880, now + 0.18); // A5
+    gain2.gain.setValueAtTime(0.35, now + 0.18);
+    gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.7);
+    osc2.connect(gain2);
+    gain2.connect(ctx.destination);
+    osc2.start(now + 0.18);
+    osc2.stop(now + 0.7);
+
+    // Mobile vibration if supported
+    if ('vibrate' in navigator) {
+      navigator.vibrate([200, 100, 200]);
+    }
+  } catch (e) {
+    console.log('Audio not supported or blocked:', e);
   }
-  if (['payment_pending', 'paid', 'completed'].includes(status)) {
-    return 'paid';
-  }
-  return status;
 }
 
 async function loadCustomerOrders() {
@@ -61,128 +239,251 @@ async function loadCustomerOrders() {
       return;
     }
 
+    // Check for newly ready items to chime
+    const currentReadyItems = data.ready_items || [];
+    let hasNewReadyItem = false;
+    currentReadyItems.forEach(item => {
+      if (!lastKnownReadyItemIds.has(item.id)) {
+        hasNewReadyItem = true;
+      }
+    });
+    if (hasNewReadyItem && currentReadyItems.length > 0) {
+      playPickupChime();
+    }
+    lastKnownReadyItemIds = new Set(currentReadyItems.map(i => i.id));
+
+    // 1. Prominent Counter Pickup Alert (If items are ready at counter)
+    let readyBannerHtml = '';
+    if (currentReadyItems.length > 0) {
+      const itemNames = currentReadyItems.map(i => `${i.quantity}x ${i.item_name}`).join(', ');
+      readyBannerHtml = `
+        <div class="counter-ready-alert">
+          <div style="background: rgba(255,255,255,0.25); width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; flex-shrink: 0;">
+            <i class="bi bi-bell-fill"></i>
+          </div>
+          <div style="flex: 1;">
+            <div style="font-size: 0.75rem; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; color: #D1FAE5;">
+              READY FOR PICKUP AT COUNTER • TOKEN #${String(data.token).padStart(2, '0')}
+            </div>
+            <div style="font-size: 1.05rem; font-weight: 800; margin: 3px 0 4px; line-height: 1.3;">
+              ${itemNames}
+            </div>
+            <p style="font-size: 0.8rem; margin: 0; color: #ECFDF5;">
+              Please walk up to the counter and collect your fresh item(s)!
+            </p>
+          </div>
+        </div>
+      `;
+    }
+
+    // 2. Token Hero Card
     let tokenHtml = '';
     if (data.token) {
       tokenHtml = `
-        <div class="token-hero-badge">
+        <div class="token-hero-badge" style="margin-bottom: 20px;">
           <div style="font-size: 0.8rem; font-weight: 700; color: #94A3B8; text-transform: uppercase; letter-spacing: 1px;">
             YOUR ASSIGNED ORDER TOKEN
           </div>
           <div class="token-large-number">#${String(data.token).padStart(2, '0')}</div>
           <div class="token-status-pill">
             <span class="status-dot" style="margin-right: 6px;"></span>
-            ${data.session_status === 'completed' ? 'Session Completed' : 'Active Dining Session'}
+            ${data.is_paid ? 'Session Paid & Completed' : (data.is_counter_requested ? 'Counter Payment Requested' : 'Active Dining Session')}
           </div>
-          <p style="font-size: 0.75rem; color: #94A3B8; margin-top: 8px;">
-            Food will be served at your token spot.
+          <p style="font-size: 0.78rem; color: #94A3B8; margin-top: 8px;">
+            Items are given one-by-one as prepared. Collect from counter!
           </p>
         </div>
       `;
     }
 
+    // 3. Orders List with Item-by-Item Breakdown
     let ordersHtml = '';
     data.orders.forEach((order, idx) => {
-      // Find current stage index mapped to customer process
-      const activeStageKey = getCustomerStageKey(order.status);
-      const stageIdx = STATUS_STAGES.findIndex(s => s.key === activeStageKey);
-      const isPaid = order.payment_status === 'paid' || order.status === 'paid' || order.status === 'completed';
+      const isPaid = data.is_paid || order.payment_status === 'paid' || order.status === 'paid';
 
-      let timelineHtml = '';
-      STATUS_STAGES.forEach((stage, sIdx) => {
-        let stepClass = '';
-        if (isPaid || sIdx < stageIdx) {
-          stepClass = 'completed';
-        } else if (sIdx === stageIdx) {
-          stepClass = 'active';
+      // Item breakdown list
+      let itemsListHtml = '';
+      (order.items || []).forEach(item => {
+        let pillClass = 'pending';
+        let pillIcon = 'bi-hourglass-split';
+        let pillText = 'Queued';
+
+        if (item.status === 'ready') {
+          pillClass = 'ready';
+          pillIcon = 'bi-bell-fill';
+          pillText = 'READY AT COUNTER 🔔';
+        } else if (item.status === 'collected') {
+          pillClass = 'collected';
+          pillIcon = 'bi-check2-circle';
+          pillText = 'Collected ✅';
+        } else if (item.status === 'preparing' || ['preparing', 'confirmed', 'sent_to_kitchen', 'kitchen_accepted'].includes(order.status)) {
+          pillClass = 'preparing';
+          pillIcon = 'bi-fire';
+          pillText = 'Cooking in Kitchen';
         }
 
-        timelineHtml += `
-          <div class="timeline-step ${stepClass}">
-            <div class="step-indicator">
-              <i class="bi ${stage.icon}"></i>
+        itemsListHtml += `
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #F1F5F9;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span class="diet-icon ${item.is_veg ? 'veg' : 'nonveg'}"></span>
+              <div>
+                <span style="font-weight: 700; font-size: 0.88rem; color: var(--text-main);">${item.quantity}x ${item.item_name}</span>
+                ${item.special_instructions ? `<div style="font-size: 0.72rem; color: #64748B;">Note: ${item.special_instructions}</div>` : ''}
+              </div>
             </div>
-            <div class="step-content">
-              <h4>${stage.label}</h4>
-              <p>${stage.desc}</p>
+            <div>
+              <span class="item-status-pill ${pillClass}">
+                <i class="bi ${pillIcon}"></i> ${pillText}
+              </span>
             </div>
           </div>
         `;
       });
 
-      let itemsSummary = order.items.map(it => `${it.quantity}x ${it.item_name}`).join(', ');
-
-      let badgeClass = 'confirmed';
-      let displayStatus = 'Order Placed';
+      let orderBadge = 'pending';
+      let orderStatusLabel = 'Order Placed';
       if (order.status === 'served') {
-        badgeClass = 'served';
-        displayStatus = 'Served';
+        orderBadge = 'served';
+        orderStatusLabel = 'Served';
       } else if (isPaid) {
-        badgeClass = 'paid';
-        displayStatus = 'Paid';
-      } else if (order.status === 'cancelled') {
-        badgeClass = 'cancelled';
-        displayStatus = 'Cancelled';
-      } else if (['preparing', 'confirmed', 'sent_to_kitchen', 'kitchen_accepted', 'ready', 'transferred_to_waiter', 'serving'].includes(order.status)) {
-        badgeClass = 'cooking';
-        displayStatus = 'Preparing';
-      } else if (order.status === 'pending') {
-        badgeClass = 'pending';
-        displayStatus = 'Pending Approval';
+        orderBadge = 'paid';
+        orderStatusLabel = 'Paid';
+      } else if (order.has_ready_items) {
+        orderBadge = 'ready';
+        orderStatusLabel = 'Item Ready at Counter 🔔';
+      } else if (['preparing', 'confirmed', 'sent_to_kitchen', 'kitchen_accepted', 'ready'].includes(order.status)) {
+        orderBadge = 'cooking';
+        orderStatusLabel = 'Preparing in Kitchen';
       }
 
       ordersHtml += `
         <div style="background: #FFFFFF; border-radius: var(--radius-lg); border: 1px solid var(--light-border); box-shadow: var(--shadow-sm); padding: 18px; margin-bottom: 20px;">
-          <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--light-border); padding-bottom: 12px; margin-bottom: 14px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--light-border); padding-bottom: 12px; margin-bottom: 12px;">
             <div>
               <span style="font-size: 0.72rem; color: var(--text-muted); font-weight: 700;">ORDER #${idx + 1}</span>
               <div style="font-weight: 800; font-size: 0.95rem; color: var(--text-main);">${order.order_id}</div>
             </div>
             <div style="text-align: right;">
-              <span class="badge badge-${badgeClass}">
-                ${displayStatus}
+              <span class="badge badge-${orderBadge}">
+                ${orderStatusLabel}
               </span>
               <div style="font-size: 0.9rem; font-weight: 800; color: var(--text-main); margin-top: 3px;">₹${order.total_amount}</div>
             </div>
           </div>
 
-          <div style="background: #F8FAFC; border-radius: var(--radius-md); padding: 10px 12px; font-size: 0.8rem; color: var(--text-muted); margin-bottom: 16px;">
-            <strong style="color: var(--text-main);">Items:</strong> ${itemsSummary}
-          </div>
-
-          <!-- Vertical Timeline -->
-          <div class="timeline">
-            ${timelineHtml}
+          <!-- Items Itemized Breakdown -->
+          <div style="margin-bottom: 12px;">
+            <div style="font-size: 0.75rem; font-weight: 800; color: #64748B; text-transform: uppercase; margin-bottom: 6px;">
+              Kitchen Items Dispatch:
+            </div>
+            ${itemsListHtml}
           </div>
         </div>
       `;
     });
 
-    const isSessionPaid = data.session_status === 'completed' || (data.orders.length > 0 && data.orders.every(o => o.payment_status === 'paid' || o.status === 'paid' || o.status === 'completed'));
-    const hasBill = data.has_bill || isSessionPaid;
-    const actionButtons = `
-      <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 24px;">
-        ${!isSessionPaid ? `
-          <a href="{{ url_for('customer.menu') }}" class="btn-primary-block" style="text-decoration: none; background: #0F172A;">
-            <i class="bi bi-plus-circle"></i> Add More Food (Same Token)
-          </a>
-        ` : ''}
-        ${hasBill && data.session_id ? `
-          <a href="/bill/${data.session_id}" class="btn-primary-block" style="text-decoration: none; background: var(--veg-color);">
-            <i class="bi bi-receipt"></i> View Digital Bill
-          </a>
-        ` : `
-          <div style="text-align: center; padding: 12px 16px; font-size: 0.8rem; color: var(--text-muted); background: #F8FAFC; border-radius: var(--radius-md); border: 1px dashed var(--light-border);">
-            <i class="bi bi-info-circle"></i> Digital Bill will be available once payment is approved by Admin.
-          </div>
-        `}
-      </div>
-    `;
+    // 4. DUAL PAYMENT SECTION (PAY FROM TABLE ONLINE OR PAY AT COUNTER)
+    let paymentCardHtml = '';
+    const isPaid = data.is_paid || (data.orders.length > 0 && data.orders.every(o => o.payment_status === 'paid' || o.status === 'paid'));
+    const isCounterReq = data.is_counter_requested;
 
-    container.innerHTML = tokenHtml + ordersHtml + actionButtons;
+    if (isPaid) {
+      paymentCardHtml = `
+        <div style="background: #F0FDF4; border: 1px solid #BBF7D0; border-radius: var(--radius-lg); padding: 20px; margin-bottom: 24px; text-align: center;">
+          <div style="display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: 50%; background: #DCFCE7; color: #16A34A; font-size: 1.3rem; margin-bottom: 8px;">
+            <i class="bi bi-check2-circle"></i>
+          </div>
+          <h4 style="font-size: 1.05rem; font-weight: 800; color: #166534; margin: 0 0 4px;">Payment Completed</h4>
+          <p style="font-size: 0.8rem; color: #15803D; margin: 0 0 16px;">Paid ₹${data.total_amount.toFixed(0)} • Digital Tax Invoice is ready</p>
+          
+          <a href="/bill/${data.session_id}" class="btn-primary-block" style="text-decoration: none; background: #16A34A; justify-content: center;">
+            <i class="bi bi-receipt"></i> View & Download Tax Bill
+          </a>
+        </div>
+      `;
+    } else {
+      // Payment Hub with two options
+      paymentCardHtml = `
+        <div style="background: #FFFFFF; border: 1px solid var(--light-border); border-radius: var(--radius-lg); padding: 20px; box-shadow: var(--shadow-sm); margin-bottom: 24px;">
+          
+          <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--light-border); padding-bottom: 14px; margin-bottom: 16px;">
+            <div>
+              <div style="font-size: 0.75rem; font-weight: 800; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px;">Dining Bill Total</div>
+              <div style="font-size: 1.4rem; font-weight: 900; color: #0F172A;">₹${data.total_amount.toFixed(0)}</div>
+            </div>
+            <div style="text-align: right;">
+              ${isCounterReq ? `
+                <span class="badge" style="background: #FEF3C7; color: #D97706; font-weight: 800; padding: 6px 10px;">
+                  <i class="bi bi-shop"></i> Counter Payment Pending
+                </span>
+              ` : `
+                <span class="badge" style="background: #FEE2E2; color: #EF4444; font-weight: 800; padding: 6px 10px;">
+                  <i class="bi bi-clock-history"></i> Payment Pending
+                </span>
+              `}
+            </div>
+          </div>
+
+          ${isCounterReq ? `
+            <div style="background: #FEF3C7; border: 1px solid #FDE68A; border-radius: 12px; padding: 12px 14px; margin-bottom: 16px; font-size: 0.82rem; color: #92400E;">
+              <strong><i class="bi bi-shop"></i> Counter Payment Requested:</strong> Please visit the counter with <strong>Token #${String(data.token).padStart(2, '0')}</strong> to pay via Cash or Counter Scanner. Staff has been notified!
+            </div>
+          ` : ''}
+
+          <div style="font-size: 0.8rem; font-weight: 800; color: #334155; margin-bottom: 10px;">
+            Choose How You Want To Pay:
+          </div>
+
+          <!-- OPTION 1: PAY ONLINE FROM TABLE -->
+          <div style="border: 2px solid #3B82F6; background: #F8FAFC; border-radius: 14px; padding: 14px; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; transition: all 0.2s;" onclick="openPayOnlineModal(${data.total_amount}, ${data.token || 0})">
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <div style="width: 42px; height: 42px; border-radius: 10px; background: #DBEAFE; color: #2563EB; display: flex; align-items: center; justify-content: center; font-size: 1.3rem;">
+                <i class="bi bi-phone"></i>
+              </div>
+              <div>
+                <div style="font-weight: 800; font-size: 0.92rem; color: #0F172A;">Pay Online (From Table)</div>
+                <div style="font-size: 0.75rem; color: #64748B;">UPI QR • GPay • PhonePe • Paytm</div>
+              </div>
+            </div>
+            <button class="btn-sm" style="background: #2563EB; color: #fff; font-weight: 700; border: none; padding: 8px 14px; border-radius: 8px;">
+              Pay ₹${data.total_amount.toFixed(0)}
+            </button>
+          </div>
+
+          <!-- OPTION 2: PAY AT COUNTER -->
+          <div style="border: 2px solid #E2E8F0; background: #FFFFFF; border-radius: 14px; padding: 14px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; transition: all 0.2s;" onclick="openPayCounterModal()">
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <div style="width: 42px; height: 42px; border-radius: 10px; background: #FEF3C7; color: #D97706; display: flex; align-items: center; justify-content: center; font-size: 1.3rem;">
+                <i class="bi bi-shop"></i>
+              </div>
+              <div>
+                <div style="font-weight: 800; font-size: 0.92rem; color: #0F172A;">Pay at Counter</div>
+                <div style="font-size: 0.75rem; color: #64748B;">Cash • Card • Counter Scanner</div>
+              </div>
+            </div>
+            <button class="btn-sm btn-outline" style="font-weight: 700; padding: 8px 14px; border-radius: 8px;">
+              Request <i class="bi bi-chevron-right"></i>
+            </button>
+          </div>
+
+        </div>
+      `;
+    }
+
+    // 5. Add More Food Button
+    const addMoreFoodHtml = !isPaid ? `
+      <div style="margin-top: 14px;">
+        <a href="{{ url_for('customer.menu') }}" class="btn-primary-block" style="text-decoration: none; background: #0F172A; justify-content: center;">
+          <i class="bi bi-plus-circle"></i> Add More Food (Same Token #${String(data.token).padStart(2, '0')})
+        </a>
+      </div>
+    ` : '';
+
+    container.innerHTML = readyBannerHtml + tokenHtml + ordersHtml + paymentCardHtml + addMoreFoodHtml;
 
   } catch (err) {
     console.error('Failed to load customer orders:', err);
-    container.innerHTML = `<div style="text-align: center; color: red;">Failed to load order tracking.</div>`;
+    container.innerHTML = `<div style="text-align: center; color: red; padding: 20px;">Failed to load order tracking. Please check connection.</div>`;
   }
 }
 
@@ -193,18 +494,164 @@ function showNoOrders(container) {
         <i class="bi bi-clock-history"></i>
       </div>
       <h3 style="font-size: 1.15rem; font-weight: 800; margin-bottom: 6px;">No Active Orders</h3>
-      <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 24px;">Scan the QR code at your spot, order dishes, and track them here in real-time!</p>
-      <a href="{{ url_for('customer.menu') }}" class="btn-primary-block" style="text-decoration: none;">
+      <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 24px;">Scan the QR code at your spot, order dishes, and track item-by-item status in real time!</p>
+      <a href="{{ url_for('customer.menu') }}" class="btn-primary-block" style="text-decoration: none; justify-content: center;">
         <i class="bi bi-menu-button-wide"></i> Browse Menu
       </a>
     </div>
   `;
 }
 
+// ═══════════ MODAL HANDLERS ═══════════
+async function openPayOnlineModal(amount, token) {
+  const browserId = localStorage.getItem('rf_browser_session_id');
+  document.getElementById('modal-bill-total').innerText = `₹${Math.round(amount)}`;
+  document.getElementById('modal-token-label').innerText = `Token #${String(token).padStart(2, '0')}`;
+  
+  try {
+    const res = await fetch(`/api/payment/info?browser_session_id=${browserId}`);
+    const info = await res.json();
+    cachedPaymentInfo = info;
+    
+    // Set dynamic QR code image URL
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(info.upi_uri)}`;
+    document.getElementById('modal-qr-image').src = qrUrl;
+    
+    // Set UPI Intent Button link
+    document.getElementById('modal-upi-intent-btn').href = info.upi_uri;
+  } catch (e) {
+    console.error('Error fetching payment info:', e);
+  }
+
+  const modal = document.getElementById('pay-online-modal');
+  modal.style.display = 'flex';
+}
+
+function closePayOnlineModal() {
+  document.getElementById('pay-online-modal').style.display = 'none';
+}
+
+function openPayCounterModal() {
+  document.getElementById('pay-counter-modal').style.display = 'flex';
+}
+
+function closePayCounterModal() {
+  document.getElementById('pay-counter-modal').style.display = 'none';
+}
+
+async function confirmOnlinePayment() {
+  const browserId = localStorage.getItem('rf_browser_session_id');
+  const btn = document.getElementById('btn-confirm-online-pay');
+  btn.disabled = true;
+  btn.innerHTML = `<span class="spinner-border spinner-border-sm"></span> Verifying Payment...`;
+
+  try {
+    const res = await fetch('/api/payment/pay-online', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        browser_session_id: browserId,
+        payment_method: 'online_upi',
+      })
+    });
+    const data = await res.json();
+    if (data.success) {
+      closePayOnlineModal();
+      if (typeof CustomerApp !== 'undefined') {
+        CustomerApp.showToast('Payment completed successfully!', 'success');
+      }
+      setTimeout(() => {
+        if (data.bill_url) {
+          window.location.href = data.bill_url;
+        } else {
+          loadCustomerOrders();
+        }
+      }, 600);
+    } else {
+      alert(data.error || 'Payment failed. Please try again.');
+      btn.disabled = false;
+      btn.innerHTML = `<i class="bi bi-check2-circle"></i> I Have Completed Payment`;
+    }
+  } catch (err) {
+    alert('Network error while recording payment.');
+    btn.disabled = false;
+    btn.innerHTML = `<i class="bi bi-check2-circle"></i> I Have Completed Payment`;
+  }
+}
+
+async function submitCounterPaymentRequest() {
+  const browserId = localStorage.getItem('rf_browser_session_id');
+  const method = document.querySelector('input[name="counter_pay_method"]:checked')?.value || 'counter_cash';
+  const btn = document.getElementById('btn-submit-counter-req');
+  btn.disabled = true;
+  btn.innerHTML = `<span class="spinner-border spinner-border-sm"></span> Notifying Counter...`;
+
+  try {
+    const res = await fetch('/api/payment/request-counter', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        browser_session_id: browserId,
+        payment_method: method
+      })
+    });
+    const data = await res.json();
+    if (data.success) {
+      closePayCounterModal();
+      if (typeof CustomerApp !== 'undefined') {
+        CustomerApp.showToast('Counter notified! Please visit the counter to pay.', 'success');
+      }
+      loadCustomerOrders();
+    } else {
+      alert(data.error || 'Request failed. Please inform counter directly.');
+    }
+  } catch (err) {
+    alert('Network error.');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = `<span>Notify Counter & Pay</span> <i class="bi bi-arrow-right"></i>`;
+  }
+}
+
+// SocketIO Live Event Listeners
+if (typeof io !== 'undefined') {
+  const socket = io();
+  const browserId = localStorage.getItem('rf_browser_session_id');
+  
+  socket.on('connect', () => {
+    fetch('/api/session', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ browser_session_id: browserId })
+    }).then(r => r.json()).then(data => {
+      if (data.session_id) {
+        socket.emit('join_session', { session_id: data.session_id });
+      }
+    });
+  });
+
+  socket.on('item_ready', (data) => {
+    playPickupChime();
+    loadCustomerOrders();
+  });
+
+  socket.on('item_collected', () => {
+    loadCustomerOrders();
+  });
+
+  socket.on('order_update', () => {
+    loadCustomerOrders();
+  });
+
+  socket.on('payment_success', () => {
+    loadCustomerOrders();
+  });
+}
+
+// Initial Load & Backup Poller
 document.addEventListener('DOMContentLoaded', () => {
   loadCustomerOrders();
-  // Poll every 5 seconds for live status
-  setInterval(loadCustomerOrders, 5000);
+  setInterval(loadCustomerOrders, 4000);
 });
 </script>
 {% endblock %}

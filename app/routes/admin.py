@@ -178,6 +178,52 @@ def send_to_kitchen(order_id):
         return jsonify({'error': str(e)}), 400
 
 
+@admin_bp.route('/order/item/<int:item_id>/status', methods=['POST'])
+@admin_required
+@csrf.exempt
+def admin_item_status(item_id):
+    """Admin updates individual item status (ready, collected, preparing)."""
+    data = request.get_json() or {}
+    new_status = data.get('status')
+    if not new_status:
+        return jsonify({'error': 'Status required'}), 400
+    try:
+        item = OrderService.update_item_status(item_id, new_status, current_user.id)
+        ActivityLog.log(f'Admin updated item "{item.item_name}" to {new_status}',
+                       user_id=current_user.id, entity_type='order', entity_id=item.order_id)
+        return jsonify({'success': True, 'item': item.to_dict()})
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+
+
+@admin_bp.route('/order/<int:order_id>/items/ready', methods=['POST'])
+@admin_required
+@csrf.exempt
+def admin_items_ready(order_id):
+    """Admin marks all items of order ready for counter pickup."""
+    try:
+        order = OrderService.mark_all_items_ready(order_id)
+        ActivityLog.log('Admin marked all order items ready', user_id=current_user.id,
+                       entity_type='order', entity_id=order_id)
+        return jsonify({'success': True, 'order': order.to_dict()})
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+
+
+@admin_bp.route('/order/<int:order_id>/items/collected', methods=['POST'])
+@admin_required
+@csrf.exempt
+def admin_items_collected(order_id):
+    """Admin marks all items of order collected by customer."""
+    try:
+        order = OrderService.mark_served(order_id)
+        ActivityLog.log('Admin marked order collected/served', user_id=current_user.id,
+                       entity_type='order', entity_id=order_id)
+        return jsonify({'success': True, 'order': order.to_dict()})
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+
+
 # ─── TOKENS ──────────────────────────────────────────────────
 @admin_bp.route('/tokens')
 @admin_required

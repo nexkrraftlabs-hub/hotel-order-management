@@ -70,7 +70,31 @@ def create_app(config_name=None):
     from app.sockets import register_socket_events
     register_socket_events(socketio)
     
+    # Ensure database schema is up-to-date
+    ensure_schema_updates(app)
+    
     return app
+
+
+def ensure_schema_updates(app):
+    """Ensure database schema includes new columns across SQLite/PostgreSQL."""
+    with app.app_context():
+        try:
+            from sqlalchemy import inspect, text
+            from app.extensions import db
+            insp = inspect(db.engine)
+            if 'order_items' in insp.get_table_names():
+                cols = [c['name'] for c in insp.get_columns('order_items')]
+                with db.engine.connect() as conn:
+                    if 'status' not in cols:
+                        conn.execute(text("ALTER TABLE order_items ADD COLUMN status VARCHAR(30) DEFAULT 'pending'"))
+                    if 'ready_at' not in cols:
+                        conn.execute(text("ALTER TABLE order_items ADD COLUMN ready_at DATETIME"))
+                    if 'collected_at' not in cols:
+                        conn.execute(text("ALTER TABLE order_items ADD COLUMN collected_at DATETIME"))
+                    conn.commit()
+        except Exception as e:
+            pass
 
 
 def register_error_handlers(app):

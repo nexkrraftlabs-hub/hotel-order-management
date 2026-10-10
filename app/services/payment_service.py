@@ -91,10 +91,74 @@ class PaymentService:
         return payment
     
     @staticmethod
+    def pay_online(session_id, payment_method='online_upi', transaction_id=None):
+        """Customer pays directly online from their table/mobile phone."""
+        session = db.session.get(CustomerSession, session_id)
+        if not session:
+            raise ValueError('Session not found')
+        
+        orders = session.orders.all()
+        if not orders:
+            raise ValueError('No orders found to pay for')
+            
+        # Step 1: Mark or create payment record
+        payment = session.payment
+        if not payment:
+            payment = PaymentService.create_payment_for_session(session)
+        
+        payment.status = Payment.PAID
+        payment.payment_method = payment_method or 'online_upi'
+        payment.paid_at = datetime.now(timezone.utc)
+        
+        # Step 2: Mark all orders as PAID
+        for order in orders:
+            if order.status in [Order.SERVED, Order.PREPARING, Order.CONFIRMED, Order.PENDING, Order.READY, Order.SERVING, Order.TRANSFERRED_TO_WAITER]:
+                order.status = Order.PAID
+                order.paid_at = datetime.now(timezone.utc)
+            order.payment_status = 'paid'
+        
+        # Step 3: Generate final bill
+        bill = BillingService.generate_bill(session)
+        
+        # Step 4: Mark session as completed
+        session.status = CustomerSession.COMPLETED
+        session.completed_at = datetime.now(timezone.utc)
+        
+        # Step 5: Release token
+        if session.token_id:
+            TokenService.release_token(session.token_id)
+        
+        db.session.commit()
+        
+        # Step 6: Send customer notification
+        NotificationService.notify_payment_success(session)
+        
+        return payment
+    
+    @staticmethod
+    def request_counter_payment(session_id, payment_method='counter_cash'):
+        """Customer requests to pay at the restaurant counter (cash or counter scan/card)."""
+        session = db.session.get(CustomerSession, session_id)
+        if not session:
+            raise ValueError('Session not found')
+            
+        payment = session.payment
+        if not payment:
+            payment = PaymentService.create_payment_for_session(session)
+            
+        payment.status = Payment.PENDING
+        payment.payment_method = payment_method or 'counter_cash'
+        session.status = CustomerSession.COUNTER_PAYMENT_REQUESTED
+        db.session.commit()
+        
+        NotificationService.notify_counter_payment_requested(session, payment_method)
+        return payment
+
+    @staticmethod
     def get_pending_payments():
-        """Get all sessions with pending payments."""
+        """Get all sessions with pending payments, including counter payment requests."""
         sessions = CustomerSession.query.filter(
-            CustomerSession.status.in_(['active', 'payment_pending'])
+            CustomerSession.status.in_(['active', 'payment_pending', 'counter_payment_requested'])
         ).all()
         
         result = []
@@ -104,11 +168,18 @@ class PaymentService:
                 # Check if any orders are served/ready
                 has_served = any(o.status in ['served', 'payment_pending', 'ready'] for o in orders)
                 total = sum(o.total_amount for o in orders)
+                is_counter_requested = (
+                    session.status == CustomerSession.COUNTER_PAYMENT_REQUESTED or
+                    (session.payment and session.payment.status == 'pending' and str(session.payment.payment_method).startswith('counter_'))
+                )
+                requested_method = session.payment.payment_method if session.payment else 'counter_cash'
                 result.append({
                     'session': session,
                     'orders': orders,
                     'total': total,
                     'has_served': has_served,
+                    'is_counter_requested': is_counter_requested,
+                    'requested_method': requested_method,
                 })
         
         return result

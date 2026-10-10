@@ -27,8 +27,11 @@ class Notification(BaseModel):
     KITCHEN_ACCEPTED = 'kitchen_accepted'
     ORDER_PREPARING = 'order_preparing'
     ORDER_READY = 'order_ready'
+    ITEM_READY = 'item_ready'
+    ITEM_COLLECTED = 'item_collected'
     WAITER_ASSIGNED = 'waiter_assigned'
     ORDER_SERVED = 'order_served'
+    COUNTER_PAYMENT_REQUESTED = 'counter_payment_requested'
     PAYMENT_SUCCESS = 'payment_success'
     BILL_READY = 'bill_ready'
     

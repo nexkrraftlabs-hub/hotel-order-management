@@ -1,39 +1,65 @@
 {% extends "admin/base_admin.html" %}
 
-{% block title %}Live Orders Monitor | Admin{% endblock %}
+{% block title %}Live Orders & Counter Dispatch | Admin{% endblock %}
 
 {% block admin_content %}
+<style>
+.live-order-card {
+  background: #FFFFFF;
+  border-radius: var(--radius-lg);
+  border: 2px solid var(--light-border);
+  box-shadow: var(--shadow-sm);
+  padding: 18px;
+  position: relative;
+}
+.live-order-card.border-counter-req {
+  border-color: #F59E0B;
+}
+</style>
+
 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
   <div>
-    <h1 style="font-size: 1.4rem; font-weight: 800;">Real-Time Order Monitor</h1>
-    <p style="font-size: 0.85rem; color: var(--text-muted);">Live pulse of all active orders from customer placement to waiter delivery</p>
+    <h1 style="font-size: 1.4rem; font-weight: 800; margin: 0 0 4px;">Real-Time Order & Counter Monitor</h1>
+    <p style="font-size: 0.85rem; color: var(--text-muted); margin: 0;">
+      Item-by-item kitchen preparation, counter pickup dispatch, and counter/online payment settlements
+    </p>
   </div>
   <button class="btn-sm btn-outline" onclick="location.reload()">
     <i class="bi bi-arrow-clockwise"></i> Refresh Now
   </button>
 </div>
 
-<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 18px;">
+<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 20px;">
   {% for o in orders %}
-  <div style="background: #FFFFFF; border-radius: var(--radius-lg); border: 1px solid var(--light-border); box-shadow: var(--shadow-sm); padding: 18px; position: relative;">
+  {% set sess = o.session %}
+  {% set isCounterReq = sess and sess.is_counter_payment_requested %}
+  {% set isPaid = o.payment_status == 'paid' or o.status == 'paid' or (sess and sess.is_paid) %}
+
+  <div class="live-order-card {% if isCounterReq %}border-counter-req{% endif %}">
+    
+    <!-- Token and Status Top Bar -->
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 1px solid var(--light-border); padding-bottom: 10px;">
       <div>
         <span style="font-size: 0.72rem; color: var(--text-muted); font-weight: 700;">ASSIGNED TOKEN</span>
-        <div style="font-size: 1.4rem; font-weight: 900; color: var(--primary);">
-          #{{ "%02d"|format(o.session.token.token_number) if o.session and o.session.token else '--' }}
+        <div style="font-size: 1.5rem; font-weight: 900; color: var(--primary);">
+          #{{ "%02d"|format(sess.token.token_number) if sess and sess.token else '--' }}
         </div>
       </div>
       <div style="text-align: right;">
-        {% if o.status in ['preparing', 'confirmed', 'sent_to_kitchen', 'kitchen_accepted', 'ready'] %}
-        <span class="badge badge-cooking">Preparing</span>
+        {% if isPaid %}
+          <span class="badge badge-paid"><i class="bi bi-check-circle-fill"></i> Paid ({{ o.session.payment.payment_method|upper if o.session and o.session.payment else 'PAID' }})</span>
+        {% elif isCounterReq %}
+          <span class="badge" style="background: #FEF3C7; color: #D97706; font-weight: 800;">
+            <i class="bi bi-shop"></i> Pay at Counter Requested
+          </span>
+        {% elif o.status in ['preparing', 'confirmed', 'sent_to_kitchen', 'kitchen_accepted', 'ready'] %}
+          <span class="badge badge-cooking">In Kitchen</span>
         {% elif o.status == 'served' %}
-        <span class="badge badge-served">Served</span>
-        {% elif o.status == 'paid' or o.payment_status == 'paid' %}
-        <span class="badge badge-paid">Paid</span>
+          <span class="badge badge-served">Served</span>
         {% elif o.status == 'cancelled' %}
-        <span class="badge badge-cancelled">Cancelled</span>
+          <span class="badge badge-cancelled">Cancelled</span>
         {% else %}
-        <span class="badge badge-pending">Pending Approval</span>
+          <span class="badge badge-pending">Pending Approval</span>
         {% endif %}
         <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">
           {{ o.created_at.strftime('%I:%M %p') if o.created_at else '' }}
@@ -41,18 +67,49 @@
       </div>
     </div>
 
-    <div style="font-size: 0.82rem; font-weight: 700; color: var(--text-main); margin-bottom: 6px;">
+    <!-- Order ID -->
+    <div style="font-size: 0.82rem; font-weight: 700; color: var(--text-main); margin-bottom: 10px;">
       Order: {{ o.order_id }}
     </div>
 
-    <ul style="list-style: none; margin-bottom: 14px; font-size: 0.85rem;">
-      {% for it in o.items %}
-      <li style="display: flex; justify-content: space-between; padding: 3px 0;">
-        <span>{{ it.quantity }}x {{ it.item_name }}</span>
-        <span style="font-weight: 700;">₹{{ "%.0f"|format(it.line_total) }}</span>
-      </li>
-      {% endfor %}
-    </ul>
+    <!-- ITEM-BY-ITEM DISPATCH TRACKING -->
+    <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 12px; padding: 10px 12px; margin-bottom: 14px;">
+      <div style="font-size: 0.72rem; font-weight: 800; color: #64748B; text-transform: uppercase; margin-bottom: 6px;">
+        Items & Counter Dispatch:
+      </div>
+      <ul style="list-style: none; margin: 0; padding: 0; font-size: 0.85rem;">
+        {% for it in o.items %}
+        <li style="display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px dashed #E2E8F0;">
+          <div style="flex: 1; padding-right: 8px;">
+            <span style="font-weight: 700;">{{ it.quantity }}x</span>
+            <span class="diet-icon {{ 'veg' if it.is_veg else 'nonveg' }}" style="display: inline-block; vertical-align: middle;"></span>
+            <span>{{ it.item_name }}</span>
+            <span style="font-size: 0.75rem; color: #64748B; margin-left: 4px;">(₹{{ "%.0f"|format(it.line_total) }})</span>
+          </div>
+
+          <!-- Item Live Status & Action Buttons -->
+          <div>
+            {% if it.status == 'ready' %}
+              <span class="badge" style="background: #DCFCE7; color: #16A34A; font-weight: 700; font-size: 0.7rem; padding: 3px 6px;">
+                Ready at Counter 🔔
+              </span>
+              <button data-item-id="{{ it.id }}" data-status="collected" onclick="handleAdminItemClick(this)" class="btn-sm" style="background: #475569; color: #fff; font-size: 0.7rem; padding: 3px 6px; margin-left: 4px;" title="Customer collected from counter">
+                Handed ✅
+              </button>
+            {% elif it.status == 'collected' %}
+              <span class="badge" style="background: #F1F5F9; color: #64748B; font-size: 0.7rem; padding: 3px 6px;">
+                Collected ✅
+              </span>
+            {% else %}
+              <button data-item-id="{{ it.id }}" data-status="ready" onclick="handleAdminItemClick(this)" class="btn-sm" style="background: #10B981; color: #fff; font-size: 0.72rem; padding: 3px 8px; font-weight: 700;" title="Mark this item ready for counter pickup">
+                <i class="bi bi-bell-fill"></i> Ready at Counter
+              </button>
+            {% endif %}
+          </div>
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
 
     {% if o.special_instructions %}
     <div style="background: #FEF3C7; color: #92400E; border-radius: var(--radius-sm); padding: 6px 10px; font-size: 0.75rem; margin-bottom: 14px;">
@@ -60,33 +117,62 @@
     </div>
     {% endif %}
 
-    <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px dashed var(--light-border); padding-top: 10px; font-size: 0.88rem;">
+    <!-- Total Amount -->
+    <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px dashed var(--light-border); padding-top: 10px; font-size: 0.88rem; margin-bottom: 12px;">
       <span style="color: var(--text-muted);">Total Amount</span>
-      <span style="font-weight: 800; font-size: 1.05rem; color: var(--text-main);">₹{{ "%.0f"|format(o.total_amount) }}</span>
+      <span style="font-weight: 800; font-size: 1.15rem; color: var(--text-main);">₹{{ "%.0f"|format(o.total_amount) }}</span>
     </div>
 
-    <div style="margin-top: 12px; display: flex; gap: 8px;">
+    <!-- COUNTER PAYMENT ALERT (IF CUSTOMER REQUESTED COUNTER PAY) -->
+    {% if isCounterReq %}
+    <div style="background: #FEF3C7; border: 1px solid #FDE68A; border-radius: 10px; padding: 10px 12px; margin-bottom: 12px;">
+      <div style="font-size: 0.78rem; font-weight: 800; color: #B45309; display: flex; align-items: center; gap: 6px; margin-bottom: 6px;">
+        <i class="bi bi-shop"></i> CUSTOMER AT COUNTER TO PAY!
+      </div>
+      <div style="font-size: 0.74rem; color: #92400E; margin-bottom: 8px;">
+        Requested via: <strong>{{ sess.payment.payment_method|upper if sess.payment else 'CASH' }}</strong>. Settle & issue bill:
+      </div>
+      <div style="display: flex; gap: 6px;">
+        <button data-session-id="{{ o.session_id }}" data-method="counter_cash" onclick="handleAdminQuickPayClick(this)" class="btn-sm btn-success" style="flex: 1; padding: 6px; font-size: 0.75rem;">
+          <i class="bi bi-cash"></i> Collect Cash
+        </button>
+        <button data-session-id="{{ o.session_id }}" data-method="counter_upi" onclick="handleAdminQuickPayClick(this)" class="btn-sm" style="background: #2563EB; color: #fff; flex: 1; padding: 6px; font-size: 0.75rem;">
+          <i class="bi bi-qr-code"></i> Collect UPI
+        </button>
+        <button data-session-id="{{ o.session_id }}" data-method="counter_card" onclick="handleAdminQuickPayClick(this)" class="btn-sm" style="background: #475569; color: #fff; flex: 1; padding: 6px; font-size: 0.75rem;">
+          <i class="bi bi-credit-card"></i> Card
+        </button>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- ORDER ACTIONS -->
+    <div style="display: flex; gap: 8px;">
       {% if o.status == 'pending' %}
-      <button class="btn-sm btn-primary" style="flex: 1; justify-content: center;" data-id="{{ o.id }}" onclick="adminApproveOrder(this.getAttribute('data-id'))">
-        <i class="bi bi-check-circle"></i> Approve Order
-      </button>
-      <button class="btn-sm btn-outline" style="color: #EF4444; border-color: #FCA5A5; padding: 6px 10px;" data-id="{{ o.id }}" onclick="adminCancelOrder(this.getAttribute('data-id'))" title="Cancel order">
-        <i class="bi bi-x-lg"></i>
-      </button>
+        <button data-order-id="{{ o.id }}" onclick="handleAdminApproveClick(this)" class="btn-sm btn-primary" style="flex: 1; justify-content: center;">
+          <i class="bi bi-check-circle"></i> Approve Order
+        </button>
+        <button data-order-id="{{ o.id }}" onclick="handleAdminCancelClick(this)" class="btn-sm btn-outline" style="color: #EF4444; border-color: #FCA5A5; padding: 6px 10px;" title="Cancel order">
+          <i class="bi bi-x-lg"></i>
+        </button>
       {% elif o.status in ['preparing', 'confirmed', 'sent_to_kitchen', 'kitchen_accepted', 'ready'] %}
-      <button class="btn-sm btn-success" style="flex: 1; justify-content: center;" data-id="{{ o.id }}" onclick="adminServeOrder(this.getAttribute('data-id'))">
-        <i class="bi bi-check2-circle"></i> Mark Served
-      </button>
-      {% elif o.status == 'served' and o.payment_status != 'paid' %}
-      <button class="btn-sm" style="flex: 1; justify-content: center; background: #F59E0B; color: #fff;" data-session-id="{{ o.session_id }}" onclick="adminApprovePayment(this.getAttribute('data-session-id'))">
-        <i class="bi bi-cash-coin"></i> Approve Payment
-      </button>
-      {% elif o.payment_status == 'paid' or o.status == 'paid' %}
-      <a href="{{ url_for('admin.bills') }}" class="btn-sm btn-outline" style="flex: 1; justify-content: center; color: #059669; text-decoration: none;">
-        <i class="bi bi-receipt"></i> Bill Ready
-      </a>
+        <button data-order-id="{{ o.id }}" onclick="handleAdminReadyAllClick(this)" class="btn-sm btn-outline" style="flex: 1; justify-content: center; color: #10B981; border-color: #10B981;">
+          <i class="bi bi-bell-fill"></i> All Ready
+        </button>
+        <button data-order-id="{{ o.id }}" onclick="handleAdminCollectedAllClick(this)" class="btn-sm btn-success" style="flex: 1; justify-content: center;">
+          <i class="bi bi-check2-all"></i> All Handed Over
+        </button>
+      {% elif not isPaid %}
+        <button data-session-id="{{ o.session_id }}" data-method="counter_cash" onclick="handleAdminQuickPayClick(this)" class="btn-sm" style="flex: 1; justify-content: center; background: #F59E0B; color: #000; font-weight: 700;">
+          <i class="bi bi-cash-coin"></i> Collect Payment & Bill
+        </button>
+      {% else %}
+        <a href="{{ url_for('admin.bills') }}" class="btn-sm btn-outline" style="flex: 1; justify-content: center; color: #059669; text-decoration: none;">
+          <i class="bi bi-receipt"></i> Bill Ready & Settle
+        </a>
       {% endif %}
     </div>
+
   </div>
   {% else %}
   <div style="grid-column: 1 / -1; background: #FFFFFF; border-radius: var(--radius-lg); padding: 50px; text-align: center; color: var(--text-muted); border: 1px solid var(--light-border);">
@@ -101,6 +187,38 @@
 {% block extra_scripts %}
 {{ super() }}
 <script>
+function handleAdminItemClick(btn) {
+  const itemId = btn.getAttribute('data-item-id');
+  const status = btn.getAttribute('data-status');
+  adminItemStatus(itemId, status);
+}
+
+function handleAdminQuickPayClick(btn) {
+  const sessionId = btn.getAttribute('data-session-id');
+  const method = btn.getAttribute('data-method') || 'counter_cash';
+  adminQuickPay(sessionId, method);
+}
+
+function handleAdminApproveClick(btn) {
+  const orderId = btn.getAttribute('data-order-id');
+  adminApproveOrder(orderId);
+}
+
+function handleAdminCancelClick(btn) {
+  const orderId = btn.getAttribute('data-order-id');
+  adminCancelOrder(orderId);
+}
+
+function handleAdminReadyAllClick(btn) {
+  const orderId = btn.getAttribute('data-order-id');
+  adminOrderReadyAll(orderId);
+}
+
+function handleAdminCollectedAllClick(btn) {
+  const orderId = btn.getAttribute('data-order-id');
+  adminOrderCollectedAll(orderId);
+}
+
 async function adminApproveOrder(orderId) {
   try {
     const res = await fetch(`/admin/order/${orderId}/approve`, {
@@ -119,35 +237,72 @@ async function adminApproveOrder(orderId) {
   }
 }
 
-async function adminServeOrder(orderId) {
+async function adminItemStatus(itemId, status) {
   try {
-    const res = await fetch(`/admin/order/${orderId}/serve`, {
+    const res = await fetch(`/admin/order/item/${itemId}/status`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' }
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: status })
     });
     const data = await res.json();
     if (data.success) {
-      App.showToast('Order marked as served', 'success');
-      setTimeout(() => location.reload(), 400);
+      App.showToast(`Item updated to ${status}! Customer notified 🔔`, 'success');
+      setTimeout(() => location.reload(), 300);
     } else {
-      App.showToast(data.error || 'Failed to serve', 'error');
+      App.showToast(data.error || 'Failed to update item', 'error');
     }
   } catch (e) {
     App.showToast('Network error', 'error');
   }
 }
 
-async function adminApprovePayment(sessionId) {
-  if (!confirm('Approve payment for this dining session and generate final bill?')) return;
+async function adminOrderReadyAll(orderId) {
+  try {
+    const res = await fetch(`/admin/order/${orderId}/items/ready`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    const data = await res.json();
+    if (data.success) {
+      App.showToast('All items marked Ready at Counter 🔔', 'success');
+      setTimeout(() => location.reload(), 300);
+    } else {
+      App.showToast(data.error || 'Failed to mark ready', 'error');
+    }
+  } catch (e) {
+    App.showToast('Network error', 'error');
+  }
+}
+
+async function adminOrderCollectedAll(orderId) {
+  try {
+    const res = await fetch(`/admin/order/${orderId}/items/collected`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    const data = await res.json();
+    if (data.success) {
+      App.showToast('Order items marked Handed Over ✅', 'success');
+      setTimeout(() => location.reload(), 300);
+    } else {
+      App.showToast(data.error || 'Failed to mark served', 'error');
+    }
+  } catch (e) {
+    App.showToast('Network error', 'error');
+  }
+}
+
+async function adminQuickPay(sessionId, method = 'cash') {
+  if (!confirm(`Settle and approve payment for this session via ${method.replace('_', ' ').toUpperCase()}?`)) return;
   try {
     const res = await fetch(`/admin/payment/approve/${sessionId}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ payment_method: 'cash' })
+      body: JSON.stringify({ payment_method: method })
     });
     const data = await res.json();
     if (data.success) {
-      App.showToast('Payment approved & bill generated', 'success');
+      App.showToast('Payment settled, token released, and bill generated!', 'success');
       setTimeout(() => location.reload(), 400);
     } else {
       App.showToast(data.error || 'Failed to approve payment', 'error');
@@ -176,9 +331,9 @@ async function adminCancelOrder(orderId) {
   }
 }
 
-// Auto reload every 10 seconds
+// Background auto refresh every 8 seconds
 setInterval(() => {
-  // Soft check can be added
-}, 10000);
+  // Can be soft checked or reloaded
+}, 8000);
 </script>
 {% endblock %}

@@ -22,14 +22,42 @@ class OrderItem(BaseModel):
     addons_text = db.Column(db.Text)
     
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    status = db.Column(db.String(30), nullable=False, default='pending')
+    ready_at = db.Column(db.DateTime, nullable=True)
+    collected_at = db.Column(db.DateTime, nullable=True)
+    
+    # Status constants
+    PENDING = 'pending'
+    PREPARING = 'preparing'
+    READY = 'ready'          # Ready at counter for pickup
+    COLLECTED = 'collected'  # Handed over / picked up by customer
     
     # Relationships
     menu_item = db.relationship('MenuItem', lazy='joined')
+    
+    @property
+    def is_ready(self):
+        return self.status == self.READY
+    
+    @property
+    def is_collected(self):
+        return self.status == self.COLLECTED
+    
+    @property
+    def status_display(self):
+        display_map = {
+            self.PENDING: 'Order Placed',
+            self.PREPARING: 'Cooking in Kitchen',
+            self.READY: 'Ready at Counter 🔔',
+            self.COLLECTED: 'Collected ✅',
+        }
+        return display_map.get(self.status, self.status.replace('_', ' ').title() if self.status else 'Pending')
     
     def to_dict(self):
         """Serialize for API responses."""
         return {
             'id': self.id,
+            'order_id': self.order_id,
             'menu_item_id': self.menu_item_id,
             'item_name': self.item_name,
             'unit_price': self.unit_price,
@@ -38,7 +66,13 @@ class OrderItem(BaseModel):
             'is_veg': self.is_veg,
             'image': self.menu_item.image if self.menu_item else None,
             'special_instructions': self.special_instructions,
+            'status': self.status or self.PENDING,
+            'status_display': self.status_display,
+            'is_ready': self.is_ready,
+            'is_collected': self.is_collected,
+            'ready_at': self.ready_at.isoformat() if self.ready_at else None,
+            'collected_at': self.collected_at.isoformat() if self.collected_at else None,
         }
     
     def __repr__(self):
-        return f'<OrderItem {self.item_name} x{self.quantity}>'
+        return f'<OrderItem {self.item_name} x{self.quantity} ({self.status})>'

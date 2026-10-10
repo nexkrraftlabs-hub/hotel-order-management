@@ -117,6 +117,28 @@ class Order(BaseModel):
             return self.session.token.token_number
         return None
     
+    @property
+    def ready_items(self):
+        """Items that are ready for pickup at the counter."""
+        return [i for i in self.items if getattr(i, 'status', None) == 'ready']
+    
+    @property
+    def collected_items(self):
+        """Items that have been picked up / collected."""
+        return [i for i in self.items if getattr(i, 'status', None) == 'collected']
+    
+    @property
+    def has_ready_items(self):
+        """Check if any items are ready at the counter."""
+        return len(self.ready_items) > 0
+    
+    @property
+    def all_items_collected(self):
+        """Check if all items have been collected."""
+        if not self.items:
+            return False
+        return all(getattr(i, 'status', None) == 'collected' for i in self.items)
+
     def to_dict(self):
         """Serialize for API responses."""
         return {
@@ -133,6 +155,10 @@ class Order(BaseModel):
             'total_amount': self.total_amount,
             'special_instructions': self.special_instructions,
             'token_number': self.token_number,
+            'has_ready_items': self.has_ready_items,
+            'ready_count': len(self.ready_items),
+            'collected_count': len(self.collected_items),
+            'total_items_count': len(self.items),
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None,
         }

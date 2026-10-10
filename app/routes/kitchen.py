@@ -98,6 +98,48 @@ def transfer_to_waiter(order_id):
         return jsonify({'error': str(e)}), 400
 
 
+@kitchen_bp.route('/item/<int:item_id>/ready', methods=['POST'])
+@kitchen_required
+@csrf.exempt
+def item_ready(item_id):
+    """Mark an individual item as ready for counter pickup."""
+    try:
+        item = OrderService.update_item_status(item_id, 'ready', current_user.id)
+        ActivityLog.log(f'Kitchen marked item "{item.item_name}" ready at counter', 
+                       user_id=current_user.id, entity_type='order', entity_id=item.order_id)
+        return jsonify({'success': True, 'item': item.to_dict()})
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+
+
+@kitchen_bp.route('/item/<int:item_id>/collected', methods=['POST'])
+@kitchen_required
+@csrf.exempt
+def item_collected(item_id):
+    """Mark an individual item as collected by customer from counter."""
+    try:
+        item = OrderService.update_item_status(item_id, 'collected', current_user.id)
+        ActivityLog.log(f'Kitchen/Counter marked item "{item.item_name}" collected', 
+                       user_id=current_user.id, entity_type='order', entity_id=item.order_id)
+        return jsonify({'success': True, 'item': item.to_dict()})
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+
+
+@kitchen_bp.route('/order/<int:order_id>/ready-all', methods=['POST'])
+@kitchen_required
+@csrf.exempt
+def order_ready_all(order_id):
+    """Mark all items of an order ready for counter pickup."""
+    try:
+        order = OrderService.mark_all_items_ready(order_id)
+        ActivityLog.log('Kitchen marked all items ready', user_id=current_user.id,
+                       entity_type='order', entity_id=order_id)
+        return jsonify({'success': True, 'order': order.to_dict()})
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+
+
 @kitchen_bp.route('/api/orders')
 @kitchen_required
 def api_kitchen_orders():
@@ -113,7 +155,18 @@ def api_kitchen_orders():
             'order_id': o.order_id,
             'status': o.status,
             'token': o.session.token.token_number if o.session and o.session.token else None,
-            'items': [{'name': i.item_name, 'qty': i.quantity, 'is_veg': i.is_veg} for i in o.items],
+            'items': [{
+                'id': i.id,
+                'name': i.item_name,
+                'qty': i.quantity,
+                'is_veg': i.is_veg,
+                'status': getattr(i, 'status', 'pending'),
+                'is_ready': getattr(i, 'status', 'pending') == 'ready',
+                'is_collected': getattr(i, 'status', 'pending') == 'collected',
+            } for i in o.items],
+            'has_ready_items': o.has_ready_items,
+            'ready_count': o.ready_count,
+            'total_items': len(o.items),
             'special_instructions': o.special_instructions,
             'created_at': o.created_at.isoformat() if o.created_at else None,
         }
