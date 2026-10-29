@@ -85,16 +85,18 @@ def ensure_schema_updates(app):
             insp = inspect(db.engine)
             if 'order_items' in insp.get_table_names():
                 cols = [c['name'] for c in insp.get_columns('order_items')]
+                is_pg = db.engine.dialect.name == 'postgresql'
+                dt_type = 'TIMESTAMP' if is_pg else 'DATETIME'
                 with db.engine.connect() as conn:
                     if 'status' not in cols:
                         conn.execute(text("ALTER TABLE order_items ADD COLUMN status VARCHAR(30) DEFAULT 'pending'"))
                     if 'ready_at' not in cols:
-                        conn.execute(text("ALTER TABLE order_items ADD COLUMN ready_at DATETIME"))
+                        conn.execute(text(f"ALTER TABLE order_items ADD COLUMN ready_at {dt_type}"))
                     if 'collected_at' not in cols:
-                        conn.execute(text("ALTER TABLE order_items ADD COLUMN collected_at DATETIME"))
+                        conn.execute(text(f"ALTER TABLE order_items ADD COLUMN collected_at {dt_type}"))
                     conn.commit()
         except Exception as e:
-            pass
+            app.logger.warning(f"ensure_schema_updates notice: {e}")
 
 
 def register_error_handlers(app):
